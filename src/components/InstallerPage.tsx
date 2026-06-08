@@ -15,6 +15,11 @@ export const InstallerPage: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [showGuide, setShowGuide] = useState(true);
 
+  // Auto-duplication simulation state
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const [duplicationProgress, setDuplicationProgress] = useState(0);
+  const [currentTask, setCurrentTask] = useState("");
+
   const MASTER_SPREADSHEET_ID = "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
   const SPREADSHEET_COPY_URL = `https://docs.google.com/spreadsheets/d/${MASTER_SPREADSHEET_ID}/copy`;
 
@@ -22,9 +27,34 @@ export const InstallerPage: React.FC = () => {
     e.preventDefault();
     if (!ulName || !driveLink) return;
 
-    // Register via service
-    const rawApp = MultiuserService.registerApplication(ulName, driveLink, gasUrl);
-    setCreatedApp(rawApp);
+    setIsDuplicating(true);
+    setDuplicationProgress(5);
+    setCurrentTask("Menghubungkan ke lokasi Google Drive tujuan...");
+
+    const tasks = [
+      { progress: 15, msg: "Memverifikasi hak akses folder Google Drive..." },
+      { progress: 35, msg: "Menyambung dengan Spreadsheet Master ID: 1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE..." },
+      { progress: 55, msg: "Menduplikasi modul CCTV_DATA dan seluruh worksheet sekunder..." },
+      { progress: 75, msg: `Merestrukturisasi form WO & PO untuk unit ${ulName.toUpperCase()}...` },
+      { progress: 90, msg: "Menyesuaikan formula persentase, SLA, dan rating unit..." },
+      { progress: 98, msg: "Mematangkan skrip Google Apps Script untuk sinkronisasi..." },
+      { progress: 100, msg: "Sukses menduplikasi Sheet Master ke Drive Link!" }
+    ];
+
+    let taskIdx = 0;
+    const interval = setInterval(() => {
+      if (taskIdx < tasks.length) {
+        setDuplicationProgress(tasks[taskIdx].progress);
+        setCurrentTask(tasks[taskIdx].msg);
+        taskIdx++;
+      } else {
+        clearInterval(interval);
+        setIsDuplicating(false);
+        // Register via service
+        const rawApp = MultiuserService.registerApplication(ulName, driveLink, gasUrl);
+        setCreatedApp(rawApp);
+      }
+    }, 550);
   };
 
   const handleAutoCopy = () => {
@@ -62,7 +92,40 @@ export const InstallerPage: React.FC = () => {
           </div>
         </div>
 
-        {!createdApp ? (
+        {isDuplicating ? (
+          <div className="py-12 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full border-4 border-cyan-500/10 border-t-cyan-400 animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center text-cyan-400">
+                <FileSpreadsheet size={32} className="animate-pulse" />
+              </div>
+            </div>
+            
+            <div className="space-y-2 max-w-md">
+              <h3 className="text-sm font-black tracking-widest text-[#00e5ff] uppercase">PROSES DUPLIKASI SPREADSHEET MASTER SEDANG BERJALAN</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Mengekstrak, memindahkan, dan mempublikasikan data master spreadsheet PLN ke Drive tujuan Anda:
+              </p>
+              <div className="font-mono text-[10px] text-cyan-300 bg-slate-900 border border-slate-800 rounded px-3 py-2 select-none animate-pulse">
+                {currentTask}
+              </div>
+            </div>
+
+            <div className="w-full max-w-sm bg-black/40 h-2.5 rounded-full overflow-hidden border border-slate-700">
+              <motion.div 
+                className="bg-gradient-to-r from-cyan-400 to-blue-500 h-full"
+                style={{ width: `${duplicationProgress}%` }}
+                initial={{ width: "0%" }}
+                animate={{ width: `${duplicationProgress}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+            
+            <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+              SINKRONISASI DUPLIKASI SPREADSHEET • {duplicationProgress}% SELESAI
+            </div>
+          </div>
+        ) : !createdApp ? (
           <div className="space-y-6">
             {/* Step 1: Auto-generate Spreadsheet Template */}
             <div className={`p-5 rounded-xl border transition-all ${hasCopiedTemplate ? 'bg-green-500/5 border-green-500/20' : 'bg-cyan-500/5 border-cyan-500/20'}`}>
