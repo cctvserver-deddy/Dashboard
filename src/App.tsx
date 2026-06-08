@@ -354,6 +354,7 @@ export default function App() {
         onTabChange={setActiveTab}
         ulName={ulName}
         isIsolatedInstaller={isIsolatedInstaller}
+        isMasterApp={appId === "master"}
       />
 
       {viewMode === 'DASHBOARD' && !isAppPending && data && (
@@ -385,7 +386,7 @@ export default function App() {
             {viewMode === 'INSTALLER' ? (
               <InstallerPage />
             ) : viewMode === 'ADMIN' ? (
-              <AdminPage />
+              <AdminPage appId={appId} />
             ) : isAppPending ? (
               /* Blockout pending screen */
               <div className="max-w-2xl mx-auto w-full py-12 px-2 text-center" id="app-pending-blocker">
@@ -401,18 +402,11 @@ export default function App() {
                     Aplikasi untuk unit <span className="text-[#00e5ff] font-black uppercase">UL {ulName}</span> dengan ID <code>{appId}</code> telah berhasil didaftarkan di sistem multiuser, namun statusnya masih tertunda.
                   </p>
                   
-                  <div className="text-left bg-[#070b1e] border border-slate-800 p-4 rounded-xl text-xs font-medium text-slate-400 space-y-2 mb-6">
+                  <div className="text-left bg-[#070b1e] border border-slate-800 p-4 rounded-xl text-xs font-medium text-slate-400 space-y-2 mb-2">
                     <p className="font-extrabold text-[#00e5ff] tracking-wide uppercase text-[10px] mb-1 underline">INFORMASI & TINDAKAN:</p>
                     <p>1. Berikan ID Aplikasi berikut pada Admin Master: <strong className="font-mono text-white bg-slate-900 px-2 py-0.5 rounded select-all">{appId}</strong></p>
-                    <p>2. Klik tombol di bawah untuk membuka panel aktivasi AKSES (Gunakan kata sandi <strong>Sadmin</strong>) jika Anda adalah pengelola utama sistem.</p>
+                    <p>2. Hubungi Admin Master (UP3 BUKITTINGGI) untuk mengaktifkan akses Unit Layanan Anda dari Dashboard Master utama.</p>
                   </div>
-
-                  <button 
-                    onClick={() => setViewMode('ADMIN')}
-                    className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-[#070b1e] font-black py-3 rounded-lg text-xs uppercase tracking-widest active:scale-95 transition-all"
-                  >
-                    BUKA PANEL AKTIVASI (SUPER ADMIN)
-                  </button>
                 </div>
               </div>
             ) : data ? (

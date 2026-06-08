@@ -7,14 +7,14 @@ import {
 } from 'lucide-react';
 import Papa from 'papaparse';
 
-export const AdminPage: React.FC = () => {
+export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<'ADMIN' | 'SADMIN' | null>(null);
 
   // App Selection for File Upload
   const [apps, setApps] = useState<AppInstance[]>([]);
-  const [selectedAppId, setSelectedAppId] = useState<string>("master");
+  const [selectedAppId, setSelectedAppId] = useState<string>(appId);
   
   // Sheet states for upload
   const [uploadSuccess, setUploadSuccess] = useState<Record<string, string>>({});
@@ -24,8 +24,14 @@ export const AdminPage: React.FC = () => {
   useEffect(() => {
     // Load registered apps
     const registered = MultiuserService.getApplications();
-    setApps(registered);
-  }, [role]);
+    if (appId !== "master") {
+      setApps(registered.filter(app => app.id === appId));
+      setSelectedAppId(appId);
+    } else {
+      setApps(registered);
+      setSelectedAppId("master");
+    }
+  }, [role, appId]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +39,10 @@ export const AdminPage: React.FC = () => {
       setRole('ADMIN'); // File Upload role
       setError(null);
     } else if (password === "Sadmin") {
+      if (appId !== "master") {
+        setError("Peran Super Admin tidak diizinkan pada aplikasi unit ini!");
+        return;
+      }
       setRole('SADMIN'); // Sadmin / Access Activation role
       setError(null);
     } else {
@@ -179,9 +189,15 @@ export const AdminPage: React.FC = () => {
               </div>
               <div className="bg-[#060a1f] border border-slate-800 rounded-lg p-3 text-[10px] text-slate-400 mt-3 flex items-start gap-2">
                 <ShieldCheck size={14} className="text-cyan-400 shrink-0 mt-0.5" />
-                <span>
-                  Gunakan sandi <strong>Admind</strong> untuk mengunggah file spreadsheet, atau sandi <strong>Sadmin</strong> untuk Tab AKSES Aktivasi Aplikasi baru.
-                </span>
+                {appId === "master" ? (
+                  <span>
+                    Gunakan sandi <strong>Admind</strong> untuk mengunggah file spreadsheet, atau sandi <strong>Sadmin</strong> untuk Tab AKSES Aktivasi Aplikasi baru.
+                  </span>
+                ) : (
+                  <span>
+                    Gunakan sandi <strong>Admind</strong> untuk masuk ke panel admin dan mengunggah override data file spreadsheet untuk unit ini.
+                  </span>
+                )}
               </div>
             </div>
 

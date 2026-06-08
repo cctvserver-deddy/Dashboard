@@ -9,6 +9,7 @@ interface HeaderProps {
   onTabChange: (tab: 'CCTV' | 'OVER_SLA' | 'RATING') => void;
   ulName?: string;
   isIsolatedInstaller?: boolean;
+  isMasterApp?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -17,7 +18,8 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab, 
   onTabChange,
   ulName = "BUKITTINGGI",
-  isIsolatedInstaller = false
+  isIsolatedInstaller = false,
+  isMasterApp = true
 }) => {
   return (
     <header className="bg-[#0a1128] text-white h-16 flex items-center justify-between px-6 sticky top-0 z-50">
@@ -72,12 +74,14 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Global Installer & Admin Tabs */}
           <span className="w-[1px] h-6 bg-white/20 mx-2" />
 
-          <NavItem 
-            icon={<PlusCircle size={15} />} 
-            label="PASANG INSTANSI" 
-            active={viewMode === 'INSTALLER'} 
-            onClick={() => onViewModeChange('INSTALLER')}
-          />
+          {isMasterApp && (
+            <NavItem 
+              icon={<PlusCircle size={15} />} 
+              label="PASANG INSTANSI" 
+              active={viewMode === 'INSTALLER'} 
+              onClick={() => onViewModeChange('INSTALLER')}
+            />
+          )}
           <NavItem 
             icon={<ShieldCheck size={15} />} 
             label="ADMIN PANEL" 
