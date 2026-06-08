@@ -58,17 +58,24 @@ export class MultiuserService {
   }
 
   /**
-   * Fetches remote applications from Google Sheets tab REGISTRASI
+   * Fetches remote applications from Google Sheets tab AKTIVASI
    */
   public static async fetchRemoteApplications(): Promise<AppInstance[]> {
-    const gasUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+    let gasUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
     if (!gasUrl) {
-      return this.getApplications();
+      // Robust fallback checking localStorage master app configuration or utilizing the default Master GAS URL
+      const apps = this.getApplications();
+      const masterApp = apps.find(a => a.id === "master");
+      if (masterApp && masterApp.gasWebUrl && !masterApp.gasWebUrl.includes("sample")) {
+        gasUrl = masterApp.gasWebUrl;
+      } else {
+        gasUrl = "https://script.google.com/macros/s/AKfycbz1bn6bD8-f7ZravXDUskT0Hucg728h_sh5xgw9p-kQxFWlpN9ZODttYb35hEly26Ka/exec";
+      }
     }
 
     try {
       const sId = "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
-      const sheetName = "REGISTRASI";
+      const sheetName = "AKTIVASI";
       const endpoints = [
         `https://docs.google.com/spreadsheets/d/${sId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
         `https://docs.google.com/spreadsheets/d/${sId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`,
@@ -175,16 +182,23 @@ export class MultiuserService {
    * Pushes current applications to remote Google Sheets tab
    */
   public static async pushApplicationsToRemote(appsToPush?: AppInstance[]): Promise<boolean> {
-    const gasUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+    let gasUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
     if (!gasUrl) {
-      return false;
+      // Robust fallback checking localStorage master app configuration or utilizing the default Master GAS URL
+      const apps = this.getApplications();
+      const masterApp = apps.find(a => a.id === "master");
+      if (masterApp && masterApp.gasWebUrl && !masterApp.gasWebUrl.includes("sample")) {
+        gasUrl = masterApp.gasWebUrl;
+      } else {
+        gasUrl = "https://script.google.com/macros/s/AKfycbz1bn6bD8-f7ZravXDUskT0Hucg728h_sh5xgw9p-kQxFWlpN9ZODttYb35hEly26Ka/exec";
+      }
     }
 
     try {
       const allApps = appsToPush || this.getApplications();
-      const sheetName = "REGISTRASI";
+      const sheetName = "AKTIVASI";
       const rows: string[][] = [
-        ["ID", "Nama ULP", "Spreadsheet ID", "GAS Web URL", "Status", "Created At"]
+        ["ID", "Nama UL", "Spreadsheet ID", "GAS Web URL", "Status", "Created At"]
       ];
 
       allApps.forEach(app => {

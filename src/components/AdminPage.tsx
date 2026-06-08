@@ -503,7 +503,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
         <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5 overflow-x-auto">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
             <h3 className="text-xs font-black tracking-widest text-[#00e5ff] uppercase flex items-center gap-1.5">
-              📋 DAFTAR REGISTRASI INSTALLER APLIKASI MULTI-USER ({apps.length - 1} Unit)
+              📋 DAFTAR AKTIVASI APLIKASI MULTI-USER ({apps.length - 1} Unit)
             </h3>
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-slate-500">Master Bukittinggi selalu diaktifkan secara global</span>
@@ -512,7 +512,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
                   setApps(MultiuserService.getApplications());
                 }}
                 className="px-2.5 py-1.5 bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors border border-cyan-500/20 flex items-center gap-1 cursor-pointer"
-                title="Segarkan data registrasi instansi baru"
+                title="Segarkan data aktivasi instansi baru"
               >
                 <RefreshCw size={11} /> Segarkan Data
               </button>
@@ -654,7 +654,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
                           <button
                             onClick={() => handleDeleteApp(app.id)}
                             className="p-1.5 rounded hover:bg-red-500/20 text-red-400 border border-transparent hover:border-red-500/20 transition-all"
-                            title="Hapus Link Registrasi"
+                            title="Hapus Link Aktivasi"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -682,7 +682,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
           <AlertCircle size={32} className="text-red-400 mx-auto" />
           <h3 className="text-sm font-black text-white uppercase tracking-wider">Akses Terbatas</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Halaman pengaturan registrasi dan aktivasi ini hanya dapat diakses melalui Aplikasi Master. Silakan gunakan password Coordinator Admin untuk fitur penimpaan file lokal unit ini.
+            Halaman pengaturan aktivasi dan registrasi ini hanya dapat diakses melalui Aplikasi Master. Silakan gunakan password Coordinator Admin untuk fitur penimpaan file lokal unit ini.
           </p>
         </div>
       )}

@@ -227,6 +227,7 @@ export const InstallerPage: React.FC = () => {
                     <li>Ubah pilihan lembar menjadi tipe <strong>"Comma-separated values (.csv)"</strong> dan pilih opsi publikasikan global agar backend aplikasi dpt membaca data Anda.</li>
                     <li>Copy link Spreadsheet baru tersebut ke kolom "LINK GOOGLE SHEET / DRIVE CEPAT" di atas.</li>
                     <li>Selesaikan pendaftaran, dan hubungi Admin Master untuk mengaktifkan link instastion Anda!</li>
+                    <li className="text-yellow-400/80 font-bold">Catatan: Sheet/Tab <span className="underline">AKTIVASI</span> adalah modul terpusat milik Master UP3 Bukittinggi untuk mendata registrasi dan status aktivasi. Sheet/Tab AKTIVASI ini tidak ikut tergenerate dan tidak diperlukan di Google Spreadsheet baru unit Anda.</li>
                   </ul>
                 </div>
               )}
