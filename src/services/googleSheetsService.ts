@@ -1,10 +1,12 @@
 import { DashboardData, OfficerPerformance, CCTVUsage, OfficerRating, KPRating, ULPRating } from "../types.ts";
 import Papa from "papaparse";
+import { MultiuserService } from "./multiuserService.ts";
 
 export class GoogleSheetsService {
   private static SPREADSHEET_ID = "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
   private static petugasCache: any[][] | null = null;
   private static ulpCache: any[][] | null = null;
+  private static lastAppId: string | null = null;
   
   // Cache for raw data to make filtering smoother
   private static rawDataCache: {
@@ -30,10 +32,26 @@ export class GoogleSheetsService {
   } | null = null;
 
   private static async fetchSheetDataRaw(sheetName: string): Promise<any[][]> {
+    const params = new URLSearchParams(window.location.search);
+    const appId = params.get("appId") || "master";
+
+    // 1. Check local storage override first for this specific app
+    const localOverride = MultiuserService.getSheetOverride(appId, sheetName);
+    if (localOverride && localOverride.length > 0) {
+      return localOverride;
+    }
+
+    // 2. Resolve Spreadsheet ID dynamically
+    let sId = this.SPREADSHEET_ID;
+    const app = MultiuserService.getApplication(appId);
+    if (app && app.status === "active") {
+      sId = app.spreadsheetId;
+    }
+
     const endpoints = [
-      `https://docs.google.com/spreadsheets/d/${this.SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
-      `https://docs.google.com/spreadsheets/d/${this.SPREADSHEET_ID}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`,
-      `https://docs.google.com/spreadsheets/d/${this.SPREADSHEET_ID}/pub?output=csv&sheet=${encodeURIComponent(sheetName)}`
+      `https://docs.google.com/spreadsheets/d/${sId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
+      `https://docs.google.com/spreadsheets/d/${sId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`,
+      `https://docs.google.com/spreadsheets/d/${sId}/pub?output=csv&sheet=${encodeURIComponent(sheetName)}`
     ];
 
     for (const url of endpoints) {
@@ -321,12 +339,25 @@ export class GoogleSheetsService {
 
     const allRegusInUlp = new Map<string, string>(); // Regu -> ULP
 
+    const params = new URLSearchParams(window.location.search);
+    const appId = params.get("appId") || "master";
+
+    // Clear caches if the active sub-app changed
+    if (this.lastAppId !== appId) {
+      this.petugasCache = null;
+      this.ulpCache = null;
+      this.rawDataCache = null;
+      this.dateFilteredCache = null;
+      this.lastAppId = appId;
+    }
+
     const now = Date.now();
     let woRows: any[][], poRows: any[][], petugasRows: any[][], ulpRows: any[][], poskoRows: any[][], ratingRows: any[][];
     const woOverSlaRptList: any[][] = [];
 
     // 1. DATA ACQUISITION (Cached or Fresh)
     const canUseRawCache = this.rawDataCache && 
+                           (this.rawDataCache as any).appId === appId &&
                            this.rawDataCache.startDate === startDate && 
                            this.rawDataCache.endDate === endDate && 
                            (now - this.rawDataCache.timestamp < 30000);
@@ -354,8 +385,9 @@ export class GoogleSheetsService {
           data: { woRows, poRows, petugasRows, ulpRows, poskoRows, ratingRows },
           startDate,
           endDate,
-          timestamp: now
-        };
+          timestamp: now,
+          appId
+        } as any;
         // Reset date cache because raw data changed
         this.dateFilteredCache = null;
       }

@@ -1,0 +1,549 @@
+import React, { useState, useEffect } from 'react';
+import { MultiuserService, AppInstance } from '../services/multiuserService.ts';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Lock, KeyRound, Upload, CheckCircle, AlertCircle, FileSpreadsheet, 
+  Trash2, ShieldCheck, RefreshCw, Power, ExternalLink, Columns, ChevronDown, Check, Eye
+} from 'lucide-react';
+import Papa from 'papaparse';
+
+export const AdminPage: React.FC = () => {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState<'ADMIN' | 'SADMIN' | null>(null);
+
+  // App Selection for File Upload
+  const [apps, setApps] = useState<AppInstance[]>([]);
+  const [selectedAppId, setSelectedAppId] = useState<string>("master");
+  
+  // Sheet states for upload
+  const [uploadSuccess, setUploadSuccess] = useState<Record<string, string>>({});
+  const [sheetPreviews, setSheetPreviews] = useState<Record<string, { headers: string[], rows: any[][] }>>({});
+  const [showPreviewModal, setShowPreviewModal] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load registered apps
+    const registered = MultiuserService.getApplications();
+    setApps(registered);
+  }, [role]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === "Admind") {
+      setRole('ADMIN'); // File Upload role
+      setError(null);
+    } else if (password === "Sadmin") {
+      setRole('SADMIN'); // Sadmin / Access Activation role
+      setError(null);
+    } else {
+      setError("Password salah! Silakan coba lagi.");
+    }
+  };
+
+  const handleLogout = () => {
+    setRole(null);
+    setPassword("");
+    setUploadSuccess({});
+    setSheetPreviews({});
+  };
+
+  // Toggle Activation (Sadmin Feature)
+  const handleToggleActivation = (id: string, currentStatus: string) => {
+    const isNowActive = currentStatus !== "active";
+    const success = MultiuserService.activateApplication(id, isNowActive);
+    if (success) {
+      // Reload apps list
+      setApps(MultiuserService.getApplications());
+    }
+  };
+
+  // Delete App (Sadmin Feature)
+  const handleDeleteApp = (id: string) => {
+    if (id === "master") return;
+    if (window.confirm("Apakah Anda yakin ingin menghapus aplikasi unit ini? Tindakan ini tidak dapat dibatalkan.")) {
+      const remaining = apps.filter(app => app.id !== id);
+      MultiuserService.saveApplications(remaining);
+      setApps(remaining);
+    }
+  };
+
+  // CSV Drag and Drop & Upload parsed (Admind Feature)
+  const handleFileUpload = (sheetName: string, file: File) => {
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert("Jenis file tidak valid! Sistem hanya mendukung format file CSV (.csv) untuk saat ini.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const csvText = e.target?.result as string;
+      if (!csvText) return;
+
+      Papa.parse(csvText, {
+        header: false,
+        skipEmptyLines: true,
+        complete: (results) => {
+          if (results.data && results.data.length > 0) {
+            const dataRows = results.data as any[][];
+            const headers = dataRows[0].map(h => String(h || "").trim());
+            const rows = dataRows.slice(1);
+
+            // Save in MultiuserService
+            const success = MultiuserService.saveSheetOverride(selectedAppId, sheetName, csvText);
+            if (success) {
+              setUploadSuccess(prev => ({
+                ...prev,
+                [sheetName]: `Berhasil mengunggah ${rows.length} baris data.`
+              }));
+              setSheetPreviews(prev => ({
+                ...prev,
+                [sheetName]: { headers, rows: rows.slice(0, 5) } // Store first 5 rows as preview
+              }));
+            } else {
+              alert("Gagal menyimpan data override ke penyimpanan lokal.");
+            }
+          } else {
+            alert("File CSV kosong atau tidak valid.");
+          }
+        },
+        error: (err) => {
+          alert("Gagal memparsing file CSV: " + err.message);
+        }
+      });
+    };
+    reader.readAsText(file);
+  };
+
+  // Reset Overrides (Restore Standard Sheets Integration)
+  const handleResetOverride = (sheetName: string) => {
+    localStorage.removeItem(`pln_sheet_override_${selectedAppId}_${sheetName.toUpperCase()}`);
+    setUploadSuccess(prev => {
+      const copy = { ...prev };
+      delete copy[sheetName];
+      return copy;
+    });
+    setSheetPreviews(prev => {
+      const copy = { ...prev };
+      delete copy[sheetName];
+      return copy;
+    });
+  };
+
+  const selectedApp = apps.find(a => a.id === selectedAppId);
+
+  const sheetsList = [
+    { name: "CCTV_DATA", label: "CCTV (Sheet CCTV_DATA)", icon: "🎥" },
+    { name: "WO", label: "Work Order (Sheet WO)", icon: "📋" },
+    { name: "PO", label: "Patrol Order (Sheet PO)", icon: "🎯" },
+    { name: "POSKO", label: "Posko ULP (Sheet POSKO)", icon: "🏠" },
+    { name: "PETUGAS", label: "Petugas / Officers (Sheet PETUGAS)", icon: "👤" },
+    { name: "ULP", label: "Unit Layanan (Sheet ULP)", icon: "🏢" },
+  ];
+
+  if (!role) {
+    return (
+      <div className="max-w-md mx-auto w-full py-16" id="login-admin">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-[#0e1738] border border-cyan-500/20 rounded-2xl p-8 shadow-2xl relative overflow-hidden"
+        >
+          {/* Subtle logo bg */}
+          <div className="absolute -right-10 -bottom-10 w-44 h-44 bg-cyan-400/[0.03] rounded-full pointer-events-none" />
+          
+          <div className="flex flex-col items-center text-center gap-3 mb-8">
+            <div className="bg-cyan-500/10 p-3.5 rounded-full border border-cyan-500/30 text-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.1)]">
+              <Lock size={28} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black tracking-widest text-[#00e5ff] uppercase">OTENTIKASI KOORDINATOR</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Masukkan kata sandi untuk melanjutkan</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label className="block text-[9px] font-black tracking-widest text-slate-300 uppercase mb-2">KATA SANDI HAK AKSES</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-[#070b1e] border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-sm text-white font-mono tracking-widest focus:outline-none focus:border-cyan-400 transition-colors"
+                  required
+                />
+                <KeyRound size={16} className="absolute left-3.5 top-3.5 text-slate-500" />
+              </div>
+              <div className="bg-[#060a1f] border border-slate-800 rounded-lg p-3 text-[10px] text-slate-400 mt-3 flex items-start gap-2">
+                <ShieldCheck size={14} className="text-cyan-400 shrink-0 mt-0.5" />
+                <span>
+                  Gunakan sandi <strong>Admind</strong> untuk mengunggah file spreadsheet, atau sandi <strong>Sadmin</strong> untuk Tab AKSES Aktivasi Aplikasi baru.
+                </span>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 p-3 rounded-lg text-xs font-semibold text-red-400 flex items-center gap-2">
+                <AlertCircle size={14} /> {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-[#070b1e] font-black py-3 rounded-lg text-xs uppercase tracking-widest hover:brightness-110 active:brightness-95 transition-all"
+            >
+              KONFIRMASI SANDI LOG MASUK
+            </button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto w-full py-4 text-slate-100 flex flex-col gap-6" id="admin-dashboard-panel">
+      {/* Action Header */}
+      <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-[#00e5ff]/10 p-2 rounded-lg text-[#00e5ff] border border-[#00e5ff]/20">
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <span className="text-[9px] font-black tracking-widest bg-cyan-500/20 text-[#00e5ff] px-2 py-0.5 rounded uppercase">
+              {role === 'SADMIN' ? "SUPER ADMIN (AKSES PANEL)" : "COORDINATOR ADMIN (FILE UPLOAD)"}
+            </span>
+            <h2 className="text-base font-black uppercase text-white mt-1">
+              {role === 'SADMIN' ? "HALAMAN AKTIVASI & AKSES APLIKASI MALAH" : "HALAMAN UNGGAH BERKAS CSV PORTAL"}
+            </h2>
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40 px-4 py-2 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all flex items-center gap-1"
+        >
+          <Power size={12} /> Keluar Panel Admin
+        </button>
+      </div>
+
+      {role === 'ADMIN' ? (
+        // ------------------------- ADMIN FILE UPLOADER -------------------------
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Instructions and Selection */}
+          <div className="lg:col-span-4 flex flex-col gap-6">
+            <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5 space-y-4">
+              <h3 className="text-xs font-black tracking-wider uppercase text-cyan-400">1. PILIH INSTANSI UNIT SASARAN</h3>
+              
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Unit Layanan Aktif</label>
+                <div className="relative">
+                  <select
+                    value={selectedAppId}
+                    onChange={(e) => {
+                      setSelectedAppId(e.target.value);
+                      setUploadSuccess({});
+                      setSheetPreviews({});
+                    }}
+                    className="w-full bg-[#070b1e] border border-slate-700 rounded-lg p-3 text-xs font-bold text-white tracking-wide appearance-none focus:outline-none focus:border-cyan-400"
+                  >
+                    {apps.map(app => (
+                      <option key={app.id} value={app.id}>
+                        {app.id === "master" ? "MASTER (UP3 BUKITTINGGI)" : `UL ${app.ulName} (${app.id})`}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3.5 top-3.5 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {selectedApp && (
+                <div className="bg-[#070b1e] rounded-lg p-3 border border-slate-800 space-y-2 text-[11px] text-slate-400 font-medium">
+                  <div className="flex justify-between border-b border-slate-900 pb-1.5">
+                    <span>Unit Kerja</span>
+                    <strong className="text-white">UL {selectedApp.ulName}</strong>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-1.5">
+                    <span>Spreadsheet ID</span>
+                    <span className="font-mono text-cyan-400 shrink-0 text-[10px] bg-cyan-950/40 px-1.5 py-0.5 rounded truncate max-w-[150px]">
+                      {selectedApp.spreadsheetId}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Link Hubungan</span>
+                    <a 
+                      href={`https://docs.google.com/spreadsheets/d/${selectedApp.spreadsheetId}`} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-cyan-400 hover:underline flex items-center gap-0.5 text-[10px]"
+                    >
+                      Buka Sheet <ExternalLink size={10} />
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5 text-xs text-slate-400 space-y-3 leading-relaxed">
+              <h3 className="text-xs font-black tracking-wider uppercase text-cyan-400">CARA KERJA UNGGAH OVERRIDE:</h3>
+              <p>
+                Fitur ini membantu Anda melatih, mencoba, atau mengoverride data spreadsheet utama Anda secara langsung dan instan via browser (Offline-first / Cache Storage).
+              </p>
+              <p>
+                File CSV yang diunggah akan menggantikan data spreadsheet target untuk sementara. File Anda tetap aman karena terenkripsi secara aman di lokal penyimpanan browser Anda.
+              </p>
+              <div className="mt-2 text-yellow-400 font-semibold p-2 bg-yellow-400/5 border border-yellow-400/10 rounded text-[10px]">
+                NB: Pastikan pemisah data menggunakan tanda koma ( , ) dan baris pertama berisi nama-nama kolom header seperti standar template.
+              </div>
+            </div>
+          </div>
+
+          {/* Files List Uploaders */}
+          <div className="lg:col-span-8 flex flex-col gap-4">
+            <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5">
+              <h3 className="text-xs font-black tracking-widest text-[#00e5ff] uppercase mb-4">2. UNGGAHAN FILE GOOGLE SHEET SESUAI DIKOLOM</h3>
+              
+              <div className="space-y-4">
+                {sheetsList.map((sheet) => {
+                  // Check if this sheet is already overridden
+                  const isOverridden = !!localStorage.getItem(`pln_sheet_override_${selectedAppId}_${sheet.name.toUpperCase()}`);
+                  
+                  return (
+                    <div 
+                      key={sheet.name} 
+                      className={`p-4 rounded-xl border transition-all ${
+                        isOverridden 
+                          ? "bg-green-500/5 border-green-500/20" 
+                          : "bg-[#070b1e] border-slate-850"
+                      } flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl mt-1 sm:mt-0">{sheet.icon}</span>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-200 tracking-wide uppercase">{sheet.label}</h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {isOverridden 
+                              ? `🟢 Overridden - Menggunakan data unggahan lokal (${uploadSuccess[sheet.name] || 'Aktif'})` 
+                              : "🔗 Standard - Membaca langsung dari Google Sheet utama."
+                            }
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-stretch sm:self-auto w-full sm:w-auto">
+                        {isOverridden && (
+                          <button
+                            onClick={() => {
+                              // Generate preview if not loaded
+                              const override = MultiuserService.getSheetOverride(selectedAppId, sheet.name);
+                              if (override) {
+                                setSheetPreviews(prev => ({
+                                  ...prev,
+                                  [sheet.name]: { headers: override[0] || [], rows: override.slice(1, 6) }
+                                }));
+                              }
+                              setShowPreviewModal(sheet.name);
+                            }}
+                            className="bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 text-cyan-400 p-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 shrink-0"
+                            title="Pratinjau Data"
+                          >
+                            <Eye size={14} /> Preview
+                          </button>
+                        )}
+                        
+                        <label className="flex-1 sm:flex-none cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase text-center transition-all flex items-center justify-center gap-1 shrink-0">
+                          <Upload size={12} /> Pilih file CSV
+                          <input
+                            type="file"
+                            accept=".csv"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(sheet.name, file);
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+
+                        {isOverridden && (
+                          <button
+                            onClick={() => handleResetOverride(sheet.name)}
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-400 p-2 rounded-lg border border-red-500/20 hover:border-red-500/40 shrink-0"
+                            title="Hapus Override (Kembali ke Sheets)"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        // ------------------------- SUPER ADMIN (SADMIN) TRASH MANAGEMENT & LINKS -------------------------
+        <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5 overflow-x-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xs font-black tracking-widest text-[#00e5ff] uppercase flex items-center gap-1.5">
+              📋 DAFTAR REGISTRASI INSTALLER APLIKASI MULTI-USER ({apps.length - 1} Unit)
+            </h3>
+            <span className="text-[10px] text-slate-500">Master Bukittinggi selalu diaktifkan secara global</span>
+          </div>
+
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400 font-bold tracking-wider text-[10px] uppercase bg-black/35">
+                <th className="p-3.5">ID / Unit Kerja</th>
+                <th className="p-3.5">Spreadsheet ID</th>
+                <th className="p-3.5">Web Apps GAS Link</th>
+                <th className="p-3.5">Status Aktivasi</th>
+                <th className="p-3.5 text-center">Tindakan Kontrol</th>
+              </tr>
+            </thead>
+            <tbody>
+              {apps.map((app) => (
+                <tr key={app.id} className="border-b border-slate-900 hover:bg-white/[0.01] transition-all">
+                  <td className="p-3.5 font-bold">
+                    <div className="flex flex-col">
+                      <span className="text-white">UL {app.ulName}</span>
+                      <span className="text-[9px] font-mono text-slate-500 tracking-wider">
+                        {app.id === "master" ? "🛡️ MASTER DEFAULT" : `id: ${app.id}`}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-3.5 font-mono text-[10px]">
+                    <span className="text-slate-400 block truncate max-w-[150px]" title={app.spreadsheetId}>
+                      {app.spreadsheetId}
+                    </span>
+                  </td>
+                  <td className="p-3.5 font-mono text-[10px] text-slate-400">
+                    {app.gasWebUrl ? (
+                      <span className="block truncate max-w-[150px]" title={app.gasWebUrl}>{app.gasWebUrl}</span>
+                    ) : (
+                      <span className="text-slate-600 block italic">Tidak terkonfigurasi</span>
+                    )}
+                  </td>
+                  <td className="p-3.5">
+                    {app.id === "master" ? (
+                      <span className="px-2 py-1 rounded bg-green-500/10 text-green-400 font-black text-[9px] uppercase tracking-wider inline-flex items-center gap-1 border border-green-500/20">
+                        <Check size={10} /> SELALU AKTIF
+                      </span>
+                    ) : app.status === "active" ? (
+                      <span className="px-2 py-1 rounded bg-green-500/20 text-[#00e5ff] font-black text-[9px] uppercase tracking-wider inline-flex items-center gap-1 border border-cyan-500/20 animate-pulse">
+                        <Check size={10} /> AKTIF & JALAN
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 rounded bg-red-500/20 text-red-400 font-black text-[9px] uppercase tracking-wider inline-flex items-center gap-1 border border-red-500/20">
+                        🔒 DIKUNCI / TERTUNDA
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3.5">
+                    <div className="flex items-center justify-center gap-2">
+                      {app.id !== "master" && (
+                        <>
+                          <button
+                            onClick={() => handleToggleActivation(app.id, app.status)}
+                            className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider border transition-all ${
+                              app.status === "active"
+                                ? "bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border-yellow-500/20"
+                                : "bg-green-500/10 hover:bg-green-500/20 text-green-400 border-green-500/20"
+                            }`}
+                          >
+                            {app.status === "active" ? "Non-Aktifkan" : "Aktifkan"}
+                          </button>
+                          
+                          <button
+                            onClick={() => handleDeleteApp(app.id)}
+                            className="p-1.5 rounded hover:bg-red-500/20 text-red-400 border border-transparent hover:border-red-500/20 transition-all"
+                            title="Hapus Link Registrasi"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
+                      
+                      <a
+                        href={`${window.location.origin}${window.location.pathname}?appId=${app.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded transition-colors border border-slate-700"
+                        title="Buka Link Aplikasi"
+                      >
+                        <ExternalLink size={14} />
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Preview Modal for Uploaded Sheets */}
+      <AnimatePresence>
+        {showPreviewModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#0e1738] border border-cyan-500/25 rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden"
+            >
+              <div className="p-4 px-6 border-b border-slate-800 bg-cyan-950/20 flex items-center justify-between">
+                <h3 className="font-black text-slate-200 tracking-wider uppercase text-xs">
+                  Pratinjau Data Unggahan - Sheet: {showPreviewModal} (5 Baris Pertama)
+                </h3>
+                <button 
+                  onClick={() => setShowPreviewModal(null)}
+                  className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
+                >
+                  ✖
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-auto p-6 scrollbar-thin">
+                {sheetPreviews[showPreviewModal] ? (
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-black/40 border-b border-slate-800">
+                        {sheetPreviews[showPreviewModal].headers.map((h, i) => (
+                          <th key={i} className="p-2.5 font-black text-[#00e5ff] tracking-wide bg-[#070b1e]/60">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sheetPreviews[showPreviewModal].rows.map((row, rIdx) => (
+                        <tr key={rIdx} className="border-b border-slate-850 hover:bg-white/[0.01]">
+                          {sheetPreviews[showPreviewModal].headers.map((_, colIdx) => (
+                            <td key={colIdx} className="p-2.5 text-slate-300 font-mono text-[11px] truncate max-w-[170px]" title={row[colIdx]}>
+                              {String(row[colIdx] !== undefined ? row[colIdx] : '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-center text-slate-500 italic py-8">Gagal memuat pratinjau data.</p>
+                )}
+              </div>
+
+              <div className="bg-slate-900 border-t border-slate-800 p-3 px-6 text-right">
+                <button 
+                  onClick={() => setShowPreviewModal(null)}
+                  className="bg-cyan-500 px-5 py-2 font-black text-[#070b1e] rounded-lg text-[10px] tracking-wider uppercase hover:bg-cyan-400 transition-all"
+                >
+                  Tutup Pratinjau
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};

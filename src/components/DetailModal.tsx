@@ -2,15 +2,18 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, FileText, Download } from 'lucide-react';
 
+import { MultiuserService } from '../services/multiuserService.ts';
+
 interface DetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   headers: string[];
   rows: any[][];
+  ulName?: string;
 }
 
-export function DetailModal({ isOpen, onClose, title, headers, rows }: DetailModalProps) {
+export function DetailModal({ isOpen, onClose, title, headers, rows, ulName }: DetailModalProps) {
   if (!isOpen) return null;
 
   const handleExportCSV = () => {
@@ -223,7 +226,7 @@ export function DetailModal({ isOpen, onClose, title, headers, rows }: DetailMod
               TOTAL: {rows.length} BARIS DATA
             </p>
             <p className="text-[10px] font-black text-gray-300 tracking-[0.3em] uppercase">
-              PLN ELECTRICITY SERVICES • UL BUKITTINGGI
+              {MultiuserService.replaceBrandingText("PLN ELECTRICITY SERVICES • UL BUKITTINGGI", ulName || "BUKITTINGGI")}
             </p>
           </div>
         </motion.div>
