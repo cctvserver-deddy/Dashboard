@@ -54,10 +54,25 @@ export default function App() {
     setAppId(id);
 
     if (id !== "master") {
-      const app = MultiuserService.getApplication(id);
+      let app = MultiuserService.getApplication(id);
       if (!app) {
+        // Automatically register unknown appId as a pending application
+        let cleanName = id;
+        if (id.startsWith("app-")) {
+          cleanName = id.substring(4).replace(/-/g, " ").toUpperCase();
+        } else {
+          cleanName = id.toUpperCase();
+        }
+        if (!cleanName || cleanName === "UNIT") cleanName = "BARU";
+        
+        // Use Master's spreadsheet ID as the default template
+        const defaultSpreadsheetId = "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
+        
+        // Register under MultiuserService
+        app = MultiuserService.registerApplication(cleanName, defaultSpreadsheetId, "");
+        
         setIsAppPending(true);
-        setActiveApp(null);
+        setActiveApp(app);
       } else if (app.status !== "active") {
         setIsAppPending(true);
         setActiveApp(app);

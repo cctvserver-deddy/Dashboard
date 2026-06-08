@@ -21,6 +21,14 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
   const [sheetPreviews, setSheetPreviews] = useState<Record<string, { headers: string[], rows: any[][] }>>({});
   const [showPreviewModal, setShowPreviewModal] = useState<string | null>(null);
 
+  // New unit manually added form states (Sadmin features)
+  const [showAddUnitForm, setShowAddUnitForm] = useState(false);
+  const [newUnitName, setNewUnitName] = useState("");
+  const [newUnitSheetId, setNewUnitSheetId] = useState("");
+  const [newUnitGasUrl, setNewUnitGasUrl] = useState("");
+  const [addUnitError, setAddUnitError] = useState<string | null>(null);
+  const [addUnitSuccess, setAddUnitSuccess] = useState<string | null>(null);
+
   const downloadCsvTemplate = (sheetName: string) => {
     const templates: Record<string, string> = {
       CCTV_DATA: "No,Nama CCTV,Unit,Tipe,Status\n1,CCTV POSKO GADUT,UL BUKITTINGGI,IP CAMERA,ONLINE",
@@ -46,7 +54,9 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
     // Load registered apps periodically (4 sec interval) for instant sync of newly registered apps
     const syncApps = () => {
       const registered = MultiuserService.getApplications();
-      if (appId !== "master") {
+      if (role === 'SADMIN' && appId === "master") {
+        setApps(registered);
+      } else if (appId !== "master") {
         setApps(registered.filter(app => app.id === appId));
         setSelectedAppId(appId);
       } else {
@@ -67,6 +77,8 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
     } else if (password === "Sadmin" && appId === "master") {
       setRole('SADMIN'); // Sadmin / Access Activation role
       setError(null);
+    } else if (password === "Sadmin") {
+      setError("Kata sandi Super Admin hanya dapat digunakan di Aplikasi Master!");
     } else {
       setError("Password salah! Silakan coba lagi.");
     }
@@ -96,6 +108,36 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
       const remaining = apps.filter(app => app.id !== id);
       MultiuserService.saveApplications(remaining);
       setApps(remaining);
+    }
+  };
+
+  // Manual Add Unit (Sadmin Feature)
+  const handleManualAddUnit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddUnitError(null);
+    setAddUnitSuccess(null);
+    if (!newUnitName.trim()) {
+      setAddUnitError("Nama Unit Kerja wajib diisi!");
+      return;
+    }
+    if (!newUnitSheetId.trim()) {
+      setAddUnitError("Spreadsheet ID / Drive Link wajib diisi!");
+      return;
+    }
+
+    try {
+      const added = MultiuserService.registerApplication(newUnitName, newUnitSheetId, newUnitGasUrl);
+      // Automatically activate the manually added unit since SADMIN added it
+      MultiuserService.activateApplication(added.id, true);
+      
+      setNewUnitName("");
+      setNewUnitSheetId("");
+      setNewUnitGasUrl("");
+      setAddUnitSuccess(`Berhasil mendaftarkan & mengaktifkan unit: UL ${added.ulName} (${added.id})!`);
+      // Update local state
+      setApps(MultiuserService.getApplications());
+    } catch (err: any) {
+      setAddUnitError(err?.message || "Gagal menambahkan unit.");
     }
   };
 
@@ -213,7 +255,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
                 <ShieldCheck size={14} className="text-cyan-400 shrink-0 mt-0.5" />
                 {appId === "master" ? (
                   <span>
-                    Gunakan sandi <strong>Admind</strong> untuk mengunggah file spreadsheet, atau sandi <strong>Sadmin</strong> untuk Tab AKSES Aktivasi Aplikasi baru.
+                    Gunakan sandi <strong>Admind</strong> untuk mengunggah file spreadsheet, atau sandi <strong>Sadmin</strong> untuk Tab AKSES Aktivasi Aplikasi baru secara global.
                   </span>
                 ) : (
                   <span>
@@ -254,7 +296,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
               {role === 'SADMIN' ? "SUPER ADMIN (AKSES PANEL)" : "COORDINATOR ADMIN (FILE UPLOAD)"}
             </span>
             <h2 className="text-base font-black uppercase text-white mt-1">
-              {role === 'SADMIN' ? "HALAMAN AKTIVASI & AKSES APLIKASI MALAH" : "HALAMAN UNGGAH BERKAS CSV PORTAL"}
+              {role === 'SADMIN' ? "HALAMAN AKTIVASI & AKSES APLIKASI MASTER" : "HALAMAN UNGGAH BERKAS CSV PORTAL"}
             </h2>
           </div>
         </div>
@@ -456,7 +498,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
             </div>
           </div>
         </div>
-      ) : (
+      ) : role === 'SADMIN' && appId === 'master' ? (
         // ------------------------- SUPER ADMIN (SADMIN) TRASH MANAGEMENT & LINKS -------------------------
         <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5 overflow-x-auto">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
@@ -474,8 +516,77 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
               >
                 <RefreshCw size={11} /> Segarkan Data
               </button>
+              <button
+                onClick={() => {
+                  setShowAddUnitForm(!showAddUnitForm);
+                  setAddUnitError(null);
+                  setAddUnitSuccess(null);
+                }}
+                className="px-2.5 py-1.5 bg-cyan-400 hover:bg-cyan-500 text-slate-950 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+              >
+                {showAddUnitForm ? "✖ Tutup Formulir" : "➕ Tambah Unit Manual"}
+              </button>
             </div>
           </div>
+
+          {showAddUnitForm && (
+            <motion.form 
+              initial={{ opacity: 0, y: -10 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              onSubmit={handleManualAddUnit}
+              className="bg-black/40 border border-slate-800 rounded-lg p-4 mb-4 grid grid-cols-1 md:grid-cols-3 gap-3"
+            >
+              <div className="flex flex-col gap-1 md:col-span-3">
+                <h4 className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-1">
+                  Pendaftaran Unit Kerja Baru secara Manual
+                </h4>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[8px] text-slate-400 font-bold uppercase">Nama Unit Kerja Baru</label>
+                <input 
+                  type="text" 
+                  value={newUnitName}
+                  onChange={(e) => setNewUnitName(e.target.value)}
+                  placeholder="Contoh: UL SOLOK"
+                  className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[8px] text-slate-400 font-bold uppercase">Google Sheet ID atau Link</label>
+                <input 
+                  type="text" 
+                  value={newUnitSheetId}
+                  onChange={(e) => setNewUnitSheetId(e.target.value)}
+                  placeholder="ID atau Link Google Spreadsheet"
+                  className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[8px] text-slate-400 font-bold uppercase">Link Web App GAS (Opsional)</label>
+                <input 
+                  type="text" 
+                  value={newUnitGasUrl}
+                  onChange={(e) => setNewUnitGasUrl(e.target.value)}
+                  placeholder="https://script.google.com/macros/s/..."
+                  className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              <div className="md:col-span-3 flex items-center justify-between gap-2 mt-1">
+                <div className="text-[10px] text-red-400 font-semibold">
+                  {addUnitError && <span>⚠ {addUnitError}</span>}
+                  {addUnitSuccess && <span className="text-green-400">✔ {addUnitSuccess}</span>}
+                </div>
+                <button 
+                  type="submit" 
+                  className="bg-cyan-400 hover:bg-cyan-500 text-slate-950 text-[9px] font-black px-4 py-1.5 rounded uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  SIMPAN & AKTIFKAN UNIT
+                </button>
+              </div>
+            </motion.form>
+          )}
 
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -551,7 +662,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
                       )}
                       
                       <a
-                        href={`https://dashboard.cctv-servet.workers.dev/?appId=${app.id}`}
+                        href={`${window.location.origin}/?appId=${app.id}`}
                         target="_blank"
                         rel="noreferrer"
                         className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded transition-colors border border-slate-700"
@@ -565,6 +676,14 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="bg-[#0e1738] border border-red-500/20 rounded-xl p-8 text-center space-y-3">
+          <AlertCircle size={32} className="text-red-400 mx-auto" />
+          <h3 className="text-sm font-black text-white uppercase tracking-wider">Akses Terbatas</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            Halaman pengaturan registrasi dan aktivasi ini hanya dapat diakses melalui Aplikasi Master. Silakan gunakan password Coordinator Admin untuk fitur penimpaan file lokal unit ini.
+          </p>
         </div>
       )}
 
