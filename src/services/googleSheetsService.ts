@@ -8,7 +8,7 @@ export class GoogleSheetsService {
   private static ulpCache: any[][] | null = null;
   private static lastAppId: string | null = null;
   
-  // Cache for raw data to make filtering smoother
+  // Cache for raw data independent of date filters to support lightning-fast sub-second filter processing
   private static rawDataCache: {
     data: {
       woRows: any[][],
@@ -18,10 +18,12 @@ export class GoogleSheetsService {
       poskoRows: any[][],
       ratingRows: any[][]
     },
-    startDate?: string,
-    endDate?: string,
+    appId: string,
     timestamp: number
   } | null = null;
+
+  // Cache for processed DashboardData results per filter combination to make page pagination/switching instant
+  private static processedCacheMap = new Map<string, { data: DashboardData; timestamp: number }>();
 
   // Cache for date-filtered rows to speed up ULP filtering
   private static dateFilteredCache: {
@@ -320,7 +322,7 @@ export class GoogleSheetsService {
     return nRegu === expectedRegu;
   }
 
-  static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string): Promise<DashboardData> {
+  static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string, bypassCache = false): Promise<DashboardData> {
     const ALLOWED_REGUS = ["BUKITTINGGI", "PADANGPANJANG", "LUBUKBASUNG", "LUBUKSIKAPING", "SIMPANGEMPAT", "BASO", "KOTOTUO"];
     const isUp3Regu = (r: string) => {
       if (!r) return false;
@@ -348,19 +350,32 @@ export class GoogleSheetsService {
       this.ulpCache = null;
       this.rawDataCache = null;
       this.dateFilteredCache = null;
+      this.processedCacheMap.clear();
       this.lastAppId = appId;
     }
 
     const now = Date.now();
+    const cacheKey = `${appId}_${startDate || ''}_${endDate || ''}_${selectedUlp || ''}`;
+
+    if (bypassCache) {
+      this.processedCacheMap.clear();
+      this.rawDataCache = null;
+    } else {
+      const cachedProcessed = this.processedCacheMap.get(cacheKey);
+      if (cachedProcessed && (now - cachedProcessed.timestamp < 30000)) {
+        // Return cached processed data instantly!
+        return cachedProcessed.data;
+      }
+    }
+
     let woRows: any[][], poRows: any[][], petugasRows: any[][], ulpRows: any[][], poskoRows: any[][], ratingRows: any[][];
     const woOverSlaRptList: any[][] = [];
 
     // 1. DATA ACQUISITION (Cached or Fresh)
-    const canUseRawCache = this.rawDataCache && 
-                           (this.rawDataCache as any).appId === appId &&
-                           this.rawDataCache.startDate === startDate && 
-                           this.rawDataCache.endDate === endDate && 
-                           (now - this.rawDataCache.timestamp < 30000);
+    const canUseRawCache = !bypassCache && 
+                           this.rawDataCache && 
+                           this.rawDataCache.appId === appId &&
+                           (now - this.rawDataCache.timestamp < 300000); // 5 minutes cache for raw sheets
 
     if (canUseRawCache) {
       const cached = this.rawDataCache!.data;
@@ -383,11 +398,9 @@ export class GoogleSheetsService {
       if (woRows.length > 0 || poRows.length > 0) {
         this.rawDataCache = {
           data: { woRows, poRows, petugasRows, ulpRows, poskoRows, ratingRows },
-          startDate,
-          endDate,
           timestamp: now,
           appId
-        } as any;
+        };
         // Reset date cache because raw data changed
         this.dateFilteredCache = null;
       }
@@ -1089,7 +1102,7 @@ export class GoogleSheetsService {
       return a.ulp.localeCompare(b.ulp);
     });
 
-    return {
+    const result: DashboardData = {
       summary: {
         totalBaca: totalWoCount,
         totalValid: totalWoCctvCount,
@@ -1263,5 +1276,10 @@ export class GoogleSheetsService {
       },
       poIndices: { name: poNameIdx, ulp: poUlpIdx, cctv: poCctvIdx },
     };
+
+    // Store in processed cache map before returning
+    this.processedCacheMap.set(cacheKey, { data: result, timestamp: Date.now() });
+
+    return result;
   }
 }

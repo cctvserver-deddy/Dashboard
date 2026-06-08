@@ -266,6 +266,25 @@ export default function App() {
     setModalOpen(true);
   };
 
+  const forceRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const result = await GoogleSheetsService.fetchData(startDate, endDate, selectedUlp, true);
+      const hasData = result.officerPerformance.length > 0 || result.summary.dataAktif > 0;
+      if (!hasData) {
+        setError("Tidak ada data yang ditemukan untuk rentang tanggal ini.");
+      } else {
+        setError(null);
+      }
+      setData(result);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      setError("Gagal menghubungkan ke Google Sheets.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     const loadData = async (showLoading = false) => {
       // If we already have data and are just changing ULP, we don't need a full-page loader
@@ -370,6 +389,7 @@ export default function App() {
           onEndDateChange={setEndDate}
           activeTab={activeTab}
           ulName={ulName}
+          onForceRefresh={forceRefresh}
         />
       )}
       

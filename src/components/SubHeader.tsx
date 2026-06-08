@@ -12,6 +12,7 @@ interface SubHeaderProps {
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
   activeTab: 'CCTV' | 'OVER_SLA' | 'RATING';
+  onForceRefresh?: () => void;
 }
 
 export const SubHeader: React.FC<SubHeaderProps> = ({ 
@@ -24,7 +25,8 @@ export const SubHeader: React.FC<SubHeaderProps> = ({
   endDate,
   onStartDateChange,
   onEndDateChange,
-  activeTab
+  activeTab,
+  onForceRefresh
 }) => {
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
@@ -120,7 +122,10 @@ export const SubHeader: React.FC<SubHeaderProps> = ({
           <RotateCcw size={18} />
         </button>
 
-        <button className="bg-brand-secondary text-white px-6 py-2.5 rounded-xl font-black text-xs tracking-widest flex items-center gap-2 shadow-lg shadow-brand-secondary/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
+        <button 
+          onClick={onForceRefresh}
+          className="bg-brand-secondary text-white px-6 py-2.5 rounded-xl font-black text-xs tracking-widest flex items-center gap-2 shadow-lg shadow-brand-secondary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
           <RefreshCw size={14} />
           SINKRON PAKSA
         </button>
