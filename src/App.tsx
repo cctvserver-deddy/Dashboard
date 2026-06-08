@@ -31,8 +31,8 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'DASHBOARD' | 'INSTALLER' | 'ADMIN'>(() => {
     const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : "");
     const mode = params.get("mode")?.toLowerCase();
-    const id = params.get("appId")?.toLowerCase();
-    if (mode === "install" || mode === "installer" || params.get("install") === "true" || id === "app-install") {
+    const id = params.get("appId")?.toLowerCase() || "";
+    if (mode === "install" || mode === "installer" || params.get("install") === "true" || id === "app-install" || id === "app-installer") {
       return 'INSTALLER';
     }
     return 'DASHBOARD';
@@ -45,8 +45,8 @@ export default function App() {
   const isIsolatedInstaller = React.useMemo(() => {
     const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : "");
     const mode = params.get("mode")?.toLowerCase();
-    const id = params.get("appId")?.toLowerCase();
-    return mode === "install" || mode === "installer" || params.get("install") === "true" || id === "app-install";
+    const id = params.get("appId")?.toLowerCase() || "";
+    return mode === "install" || mode === "installer" || params.get("install") === "true" || id === "app-install" || id === "app-installer";
   }, []);
 
   // Monitor appId and activation status
@@ -59,7 +59,7 @@ export default function App() {
       // Fetch latest apps list from remote first
       await MultiuserService.fetchRemoteApplications();
 
-      if (id.toLowerCase() === "app-install") {
+      if (id.toLowerCase() === "app-install" || id.toLowerCase() === "app-installer") {
         setIsAppPending(false);
         setActiveApp(null);
         return;

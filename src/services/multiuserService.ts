@@ -133,7 +133,7 @@ export class MultiuserService {
         }
       }
 
-      // Merge remote with local to protect any offline additions
+      // Merge remote with local to protect any offline additions or activation status changes
       const localApps = this.getApplications();
       let hasNewLocal = false;
       localApps.forEach(localApp => {
@@ -141,6 +141,20 @@ export class MultiuserService {
         if (idx === -1) {
           apps.push(localApp);
           hasNewLocal = true;
+        } else {
+          // If status or details are different in local storage, we preserve the local state 
+          // (which is the source of truth when the Master admin changes activation status)
+          const remoteApp = apps[idx];
+          if (remoteApp.status !== localApp.status || remoteApp.spreadsheetId !== localApp.spreadsheetId || remoteApp.gasWebUrl !== localApp.gasWebUrl) {
+            apps[idx] = {
+              ...remoteApp,
+              status: localApp.status,
+              spreadsheetId: localApp.spreadsheetId,
+              gasWebUrl: localApp.gasWebUrl,
+              ulName: localApp.ulName
+            };
+            hasNewLocal = true;
+          }
         }
       });
 

@@ -83,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
       ) : (
         <div className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase animate-pulse">
-          ⚡ MODE PEMASANGAN BARU (MULTI-USER)
+          ⚡ MODE INSTAL APLIKASI (MULTI-USER)
         </div>
       )}
 
