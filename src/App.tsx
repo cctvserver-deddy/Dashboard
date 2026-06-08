@@ -53,37 +53,45 @@ export default function App() {
     const id = params.get("appId") || "master";
     setAppId(id);
 
-    if (id !== "master") {
-      let app = MultiuserService.getApplication(id);
-      if (!app) {
-        // Automatically register unknown appId as a pending application
-        let cleanName = id;
-        if (id.startsWith("app-")) {
-          cleanName = id.substring(4).replace(/-/g, " ").toUpperCase();
-        } else {
-          cleanName = id.toUpperCase();
+    const initApp = async () => {
+      // Fetch latest apps list from remote first
+      await MultiuserService.fetchRemoteApplications();
+
+      if (id !== "master") {
+        let app = MultiuserService.getApplication(id);
+        if (!app) {
+          // Automatically register unknown appId as a pending application
+          let cleanName = id;
+          if (id.startsWith("app-")) {
+            cleanName = id.substring(4).replace(/-/g, " ").toUpperCase();
+          } else {
+            cleanName = id.toUpperCase();
+          }
+          if (!cleanName || cleanName === "UNIT") cleanName = "BARU";
+          
+          // Use Master's spreadsheet ID as the default template
+          const defaultSpreadsheetId = "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
+          
+          // Register under MultiuserService
+          app = MultiuserService.registerApplication(cleanName, defaultSpreadsheetId, "");
         }
-        if (!cleanName || cleanName === "UNIT") cleanName = "BARU";
-        
-        // Use Master's spreadsheet ID as the default template
-        const defaultSpreadsheetId = "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
-        
-        // Register under MultiuserService
-        app = MultiuserService.registerApplication(cleanName, defaultSpreadsheetId, "");
-        
-        setIsAppPending(true);
-        setActiveApp(app);
-      } else if (app.status !== "active") {
-        setIsAppPending(true);
-        setActiveApp(app);
+
+        // Fetch refreshed status
+        app = MultiuserService.getApplication(id);
+        if (app && app.status !== "active") {
+          setIsAppPending(true);
+          setActiveApp(app);
+        } else if (app) {
+          setIsAppPending(false);
+          setActiveApp(app);
+        }
       } else {
         setIsAppPending(false);
-        setActiveApp(app);
+        setActiveApp(null);
       }
-    } else {
-      setIsAppPending(false);
-      setActiveApp(null);
-    }
+    };
+
+    initApp();
   }, [viewMode]); // Re-run whenever view mode switches or page mounts to capture activation state changes
 
   const ulName = activeApp ? activeApp.ulName : "BUKITTINGGI";

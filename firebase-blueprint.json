@@ -1,0 +1,24 @@
+{
+  "entities": {
+    "appInstance": {
+      "title": "AppInstance",
+      "description": "Representative schema for a registered app instance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ulName": { "type": "string" },
+        "spreadsheetId": { "type": "string" },
+        "gasWebUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "active"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ulName", "spreadsheetId", "gasWebUrl", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/multiuser_apps/{appId}": {
+      "schema": "appInstance",
+      "description": "Collection of registered sub-applications (multi-user setups)"
+    }
+  }
+}

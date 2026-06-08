@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import Papa from "papaparse";
 
 export interface AppInstance {
@@ -53,6 +54,156 @@ export class MultiuserService {
    */
   public static saveApplications(apps: AppInstance[]): void {
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(apps));
+    this.pushApplicationsToRemote(apps);
+  }
+
+  /**
+   * Fetches remote applications from Google Sheets tab REGISTRASI
+   */
+  public static async fetchRemoteApplications(): Promise<AppInstance[]> {
+    const gasUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+    if (!gasUrl) {
+      return this.getApplications();
+    }
+
+    try {
+      const sId = "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
+      const sheetName = "REGISTRASI";
+      const endpoints = [
+        `https://docs.google.com/spreadsheets/d/${sId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
+        `https://docs.google.com/spreadsheets/d/${sId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`,
+        `https://docs.google.com/spreadsheets/d/${sId}/pub?output=csv&sheet=${encodeURIComponent(sheetName)}`,
+        `${gasUrl}?sheet=${encodeURIComponent(sheetName)}`
+      ];
+
+      let csvText = "";
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url, { cache: "no-store" });
+          if (res.ok) {
+            const text = await res.text();
+            if (text && !text.trim().startsWith("<!DOCTYPE html>") && !text.includes("<html") && !text.includes("google-signin")) {
+              csvText = text;
+              break;
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      if (!csvText) {
+        return this.getApplications();
+      }
+
+      const parsed = Papa.parse(csvText, {
+        header: false,
+        skipEmptyLines: true
+      });
+
+      const rows = parsed.data as string[][];
+      if (rows.length <= 1) {
+        return this.getApplications();
+      }
+
+      const apps: AppInstance[] = [this.MASTER_APP];
+      const startIdx = (rows[0][0] || "").toLowerCase().includes("id") ? 1 : 0;
+
+      for (let i = startIdx; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.length < 5) continue;
+        const id = String(row[0] || "").trim();
+        const ulName = String(row[1] || "").trim();
+        const spreadsheetId = String(row[2] || "").trim();
+        const gasWebUrl = String(row[3] || "").trim();
+        const status = String(row[4] || "").trim() === "active" ? "active" : "pending";
+        const createdAt = String(row[5] || row[4] || "").trim();
+
+        if (id && id !== "master" && id !== "ID") {
+          if (!apps.some(a => a.id === id)) {
+            apps.push({
+              id,
+              ulName,
+              spreadsheetId,
+              gasWebUrl,
+              status,
+              createdAt: createdAt || new Date().toISOString()
+            });
+          }
+        }
+      }
+
+      // Merge remote with local to protect any offline additions
+      const localApps = this.getApplications();
+      let hasNewLocal = false;
+      localApps.forEach(localApp => {
+        const idx = apps.findIndex(remoteApp => remoteApp.id === localApp.id);
+        if (idx === -1) {
+          apps.push(localApp);
+          hasNewLocal = true;
+        }
+      });
+
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(apps));
+      
+      if (hasNewLocal) {
+        this.pushApplicationsToRemote(apps);
+      }
+
+      return apps;
+    } catch (e) {
+      console.error("Failed to fetch remote registered apps:", e);
+      return this.getApplications();
+    }
+  }
+
+  /**
+   * Pushes current applications to remote Google Sheets tab
+   */
+  public static async pushApplicationsToRemote(appsToPush?: AppInstance[]): Promise<boolean> {
+    const gasUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+    if (!gasUrl) {
+      return false;
+    }
+
+    try {
+      const allApps = appsToPush || this.getApplications();
+      const sheetName = "REGISTRASI";
+      const rows: string[][] = [
+        ["ID", "Nama ULP", "Spreadsheet ID", "GAS Web URL", "Status", "Created At"]
+      ];
+
+      allApps.forEach(app => {
+        if (app.id !== "master") {
+          rows.push([
+            app.id,
+            app.ulName,
+            app.spreadsheetId,
+            app.gasWebUrl,
+            app.status,
+            app.createdAt
+          ]);
+        }
+      });
+
+      await fetch(gasUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain"
+        },
+        body: JSON.stringify({
+          sheet: sheetName,
+          rows: rows,
+          append: false
+        })
+      });
+
+      return true;
+    } catch (e) {
+      console.error("Failed to push apps list to remote:", e);
+      return false;
+    }
   }
 
   /**

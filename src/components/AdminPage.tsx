@@ -52,8 +52,8 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
 
   useEffect(() => {
     // Load registered apps periodically (4 sec interval) for instant sync of newly registered apps
-    const syncApps = () => {
-      const registered = MultiuserService.getApplications();
+    const syncApps = async () => {
+      const registered = await MultiuserService.fetchRemoteApplications();
       if (role === 'SADMIN' && appId === "master") {
         setApps(registered);
       } else if (appId !== "master") {
