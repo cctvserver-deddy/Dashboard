@@ -63,7 +63,7 @@ export const InstallerPage: React.FC = () => {
   };
 
   const getFullAppLink = (id: string) => {
-    return `${window.location.origin}${window.location.pathname}?appId=${id}`;
+    return `https://dashboard.cctv-servet.workers.dev/?appId=${id}`;
   };
 
   const copyToClipboard = (text: string, setCopied: (v: boolean) => void) => {

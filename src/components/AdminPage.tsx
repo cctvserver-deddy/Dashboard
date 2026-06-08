@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MultiuserService, AppInstance } from '../services/multiuserService.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Lock, KeyRound, Upload, CheckCircle, AlertCircle, FileSpreadsheet, 
+  Lock, KeyRound, Upload, CheckCircle, AlertCircle, FileSpreadsheet, Download,
   Trash2, ShieldCheck, RefreshCw, Power, ExternalLink, Columns, ChevronDown, Check, Eye
 } from 'lucide-react';
 import Papa from 'papaparse';
@@ -21,16 +21,42 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
   const [sheetPreviews, setSheetPreviews] = useState<Record<string, { headers: string[], rows: any[][] }>>({});
   const [showPreviewModal, setShowPreviewModal] = useState<string | null>(null);
 
+  const downloadCsvTemplate = (sheetName: string) => {
+    const templates: Record<string, string> = {
+      CCTV_DATA: "No,Nama CCTV,Unit,Tipe,Status\n1,CCTV POSKO GADUT,UL BUKITTINGGI,IP CAMERA,ONLINE",
+      WO: "No Laporan,Tgl Lapor,Nama Petugas,ULP,Posko,Nama Regu,APKT Status,RPT,RCT,Durasi WO,CCTV,Source,Rating,Check In Petugas,Tgl Penugasan Regu,Tgl Dalam Perjalanan,Tgl Nyala,Check Out Petugas,Shift\nL12345,08/06/2026 08:00:00,AHMAD,ULP BUKITTINGGI,POSKO BUKITTINGGI,BUKITTINGGI,SELESAI,15,30,45,CCTV AKTIF,PLN MOBILE,5,08/06/2026 08:05:00,08/06/2026 08:01:00,08/06/2026 08:10:00,08/06/2026 08:25:00,08/06/2026 08:35:00,PAGI",
+      PO: "No Tugas,Tgl,Nama Petugas,ULP,Posko,Nama Regu,CCTV\nT98765,08/06/2026 09:15:00,BUDI,ULP PADANG PANJANG,POSKO PADANG PANJANG,PADANGPANJANG,CCTV AKTIF",
+      POSKO: "Posko,PoskoId,Ulp_Id\nPOSKO BUKITTINGGI,1,1\nPOSKO PADANG PANJANG,2,2",
+      PETUGAS: "Name,UlpId,Ulp\nAHMAD,1,UL BUKITTINGGI\nBUDI,2,UL PADANG PANJANG",
+      ULP: "Id,Name\n1,UL BUKITTINGGI\n2,UL PADANG PANJANG"
+    };
+
+    const csvContent = templates[sheetName] || "";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `TEMPLATE_CSV_${sheetName.toUpperCase()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   useEffect(() => {
-    // Load registered apps
-    const registered = MultiuserService.getApplications();
-    if (appId !== "master") {
-      setApps(registered.filter(app => app.id === appId));
-      setSelectedAppId(appId);
-    } else {
-      setApps(registered);
-      setSelectedAppId("master");
-    }
+    // Load registered apps periodically (4 sec interval) for instant sync of newly registered apps
+    const syncApps = () => {
+      const registered = MultiuserService.getApplications();
+      if (appId !== "master") {
+        setApps(registered.filter(app => app.id === appId));
+        setSelectedAppId(appId);
+      } else {
+        setApps(registered);
+      }
+    };
+
+    syncApps();
+    const interval = setInterval(syncApps, 4000);
+    return () => clearInterval(interval);
   }, [role, appId]);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -38,11 +64,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
     if (password === "Admind") {
       setRole('ADMIN'); // File Upload role
       setError(null);
-    } else if (password === "Sadmin") {
-      if (appId !== "master") {
-        setError("Peran Super Admin tidak diizinkan pada aplikasi unit ini!");
-        return;
-      }
+    } else if (password === "Sadmin" && appId === "master") {
       setRole('SADMIN'); // Sadmin / Access Activation role
       setError(null);
     } else {
@@ -257,12 +279,15 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
                 <div className="relative">
                   <select
                     value={selectedAppId}
+                    disabled={appId !== "master"}
                     onChange={(e) => {
                       setSelectedAppId(e.target.value);
                       setUploadSuccess({});
                       setSheetPreviews({});
                     }}
-                    className="w-full bg-[#070b1e] border border-slate-700 rounded-lg p-3 text-xs font-bold text-white tracking-wide appearance-none focus:outline-none focus:border-cyan-400"
+                    className={`w-full bg-[#070b1e] border border-slate-700 rounded-lg p-3 text-xs font-bold text-white tracking-wide appearance-none focus:outline-none focus:border-cyan-400 ${
+                      appId !== "master" ? "opacity-60 cursor-not-allowed bg-slate-900/50" : ""
+                    }`}
                   >
                     {apps.map(app => (
                       <option key={app.id} value={app.id}>
@@ -301,16 +326,41 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
               )}
             </div>
 
-            <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5 text-xs text-slate-400 space-y-3 leading-relaxed">
+            <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5 text-xs text-slate-400 space-y-3 leading-relaxed font-semibold">
               <h3 className="text-xs font-black tracking-wider uppercase text-cyan-400">CARA KERJA UNGGAH OVERRIDE:</h3>
-              <p>
+              <p className="font-medium">
                 Fitur ini membantu Anda melatih, mencoba, atau mengoverride data spreadsheet utama Anda secara langsung dan instan via browser (Offline-first / Cache Storage).
               </p>
-              <p>
+              <p className="font-medium">
                 File CSV yang diunggah akan menggantikan data spreadsheet target untuk sementara. File Anda tetap aman karena terenkripsi secara aman di lokal penyimpanan browser Anda.
               </p>
               <div className="mt-2 text-yellow-400 font-semibold p-2 bg-yellow-400/5 border border-yellow-400/10 rounded text-[10px]">
                 NB: Pastikan pemisah data menggunakan tanda koma ( , ) dan baris pertama berisi nama-nama kolom header seperti standar template.
+              </div>
+            </div>
+
+            {/* CSV Template Download Panel */}
+            <div className="bg-[#0e1738] border border-cyan-500/15 rounded-xl p-5 space-y-3">
+              <h3 className="text-xs font-black tracking-wider uppercase text-[#00e5ff] flex items-center gap-1.5">
+                <FileSpreadsheet size={15} /> UNDUH TEMPLATE CSV PORTAL
+              </h3>
+              <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                Silakan unduh contoh file CSV siap pakai yang sesuai dengan format dan nama kolom standar sistem:
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {sheetsList.map(sheet => (
+                  <button
+                    key={sheet.name}
+                    onClick={() => downloadCsvTemplate(sheet.name)}
+                    className="bg-[#070b1e] border border-slate-800 hover:border-cyan-400/50 p-2.5 rounded-lg text-left transition-all flex items-center gap-2 group cursor-pointer"
+                  >
+                    <span className="text-lg group-hover:scale-110 transition-transform">{sheet.icon}</span>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-black text-slate-200 group-hover:text-cyan-400 truncate">{sheet.name}</div>
+                      <div className="text-[8px] text-slate-500 font-mono tracking-wider">Unduh Template</div>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -368,6 +418,14 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
                           </button>
                         )}
                         
+                        <button
+                          onClick={() => downloadCsvTemplate(sheet.name)}
+                          className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-400 p-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 shrink-0 border border-slate-800"
+                          title="Unduh Contoh Template CSV"
+                        >
+                          <Download size={14} /> Template
+                        </button>
+
                         <label className="flex-1 sm:flex-none cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase text-center transition-all flex items-center justify-center gap-1 shrink-0">
                           <Upload size={12} /> Pilih file CSV
                           <input
@@ -401,11 +459,22 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
       ) : (
         // ------------------------- SUPER ADMIN (SADMIN) TRASH MANAGEMENT & LINKS -------------------------
         <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5 overflow-x-auto">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
             <h3 className="text-xs font-black tracking-widest text-[#00e5ff] uppercase flex items-center gap-1.5">
               📋 DAFTAR REGISTRASI INSTALLER APLIKASI MULTI-USER ({apps.length - 1} Unit)
             </h3>
-            <span className="text-[10px] text-slate-500">Master Bukittinggi selalu diaktifkan secara global</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-500">Master Bukittinggi selalu diaktifkan secara global</span>
+              <button
+                onClick={() => {
+                  setApps(MultiuserService.getApplications());
+                }}
+                className="px-2.5 py-1.5 bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors border border-cyan-500/20 flex items-center gap-1 cursor-pointer"
+                title="Segarkan data registrasi instansi baru"
+              >
+                <RefreshCw size={11} /> Segarkan Data
+              </button>
+            </div>
           </div>
 
           <table className="w-full text-left text-xs border-collapse">
@@ -482,7 +551,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
                       )}
                       
                       <a
-                        href={`${window.location.origin}${window.location.pathname}?appId=${app.id}`}
+                        href={`https://dashboard.cctv-servet.workers.dev/?appId=${app.id}`}
                         target="_blank"
                         rel="noreferrer"
                         className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded transition-colors border border-slate-700"

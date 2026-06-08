@@ -90,12 +90,35 @@ export class MultiuserService {
   }
 
   /**
+   * Generates a slug-based ID from the Unit name, prefixing it with 'app-'
+   * Example: "UL SOLOK" -> "app-solok"
+   * Example: "ULP PADANG PANJANG" -> "app-padang-panjang"
+   */
+  public static generateAppIdFromUlName(ulName: string): string {
+    const raw = String(ulName || "").trim().toUpperCase();
+    // Strip prefixes like "ULP ", "UL ", "UP3 " (case-insensitive)
+    let clean = raw.replace(/^(ULP|UL|UP3)\s+/i, "").trim();
+    if (!clean) clean = raw; // fallback in case only "UL" was entered
+    
+    const slug = clean
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-") // replace anything not alphanumeric with hyphen
+      .replace(/-+/g, "-")         // remove duplicate hyphens
+      .replace(/^-|-$/g, "");      // trim hyphens from ends
+      
+    return "app-" + (slug || "unit");
+  }
+
+  /**
    * Register a new sub-app. Initially "pending" status as requested
    */
   public static registerApplication(ulName: string, driveLink: string, gasWebUrl: string = ""): AppInstance {
     const rawName = String(ulName || "").trim().toUpperCase();
-    const id = "app-" + Math.random().toString(36).substring(2, 8);
+    const id = this.generateAppIdFromUlName(rawName);
     const spreadsheetId = this.extractSpreadsheetId(driveLink);
+
+    const apps = this.getApplications();
+    const existingIndex = apps.findIndex(app => app.id === id);
 
     const newApp: AppInstance = {
       id,
@@ -106,8 +129,13 @@ export class MultiuserService {
       createdAt: new Date().toISOString()
     };
 
-    const apps = this.getApplications();
-    apps.push(newApp);
+    if (existingIndex !== -1) {
+      // Overwrite/Update existing instance to avoid duplicate ID issues
+      apps[existingIndex] = newApp;
+    } else {
+      apps.push(newApp);
+    }
+
     this.saveApplications(apps);
     return newApp;
   }
