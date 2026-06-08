@@ -35,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div>
           <h1 className="text-sm font-black tracking-tighter leading-none">DASHBOARD MONITORING YANDAL</h1>
           <p className="text-[10px] text-brand-accent font-bold opacity-80 uppercase">
-            {MultiuserService.replaceBrandingText("PLN ES BUKITTINGGI", ulName)}
+            {isMasterApp ? "MASTER" : MultiuserService.replaceBrandingText("PLN ES BUKITTINGGI", ulName)}
           </p>
         </div>
       </div>
