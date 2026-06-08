@@ -31,7 +31,8 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'DASHBOARD' | 'INSTALLER' | 'ADMIN'>(() => {
     const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : "");
     const mode = params.get("mode")?.toLowerCase();
-    if (mode === "install" || mode === "installer" || params.get("install") === "true") {
+    const id = params.get("appId")?.toLowerCase();
+    if (mode === "install" || mode === "installer" || params.get("install") === "true" || id === "app-install") {
       return 'INSTALLER';
     }
     return 'DASHBOARD';
@@ -44,7 +45,8 @@ export default function App() {
   const isIsolatedInstaller = React.useMemo(() => {
     const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : "");
     const mode = params.get("mode")?.toLowerCase();
-    return mode === "install" || mode === "installer" || params.get("install") === "true";
+    const id = params.get("appId")?.toLowerCase();
+    return mode === "install" || mode === "installer" || params.get("install") === "true" || id === "app-install";
   }, []);
 
   // Monitor appId and activation status
@@ -56,6 +58,12 @@ export default function App() {
     const initApp = async () => {
       // Fetch latest apps list from remote first
       await MultiuserService.fetchRemoteApplications();
+
+      if (id.toLowerCase() === "app-install") {
+        setIsAppPending(false);
+        setActiveApp(null);
+        return;
+      }
 
       if (id !== "master") {
         let app = MultiuserService.getApplication(id);
@@ -309,6 +317,10 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (isIsolatedInstaller) {
+      return;
+    }
+
     const loadData = async (showLoading = false) => {
       // If we already have data and are just changing ULP, we don't need a full-page loader
       // the new caching logic in GoogleSheetsService handles this instantly
@@ -336,7 +348,7 @@ export default function App() {
     loadData(!data);
     const interval = setInterval(() => loadData(false), 30000);
     return () => clearInterval(interval);
-  }, [startDate, endDate, selectedUlp]);
+  }, [startDate, endDate, selectedUlp, isIsolatedInstaller]);
 
   const isLoadingData = !data && viewMode === 'DASHBOARD' && !isAppPending;
 

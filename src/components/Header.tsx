@@ -74,14 +74,6 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Global Installer & Admin Tabs */}
           <span className="w-[1px] h-6 bg-white/20 mx-2" />
 
-          {isMasterApp && (
-            <NavItem 
-              icon={<PlusCircle size={15} />} 
-              label="PASANG INSTANSI" 
-              active={viewMode === 'INSTALLER'} 
-              onClick={() => onViewModeChange('INSTALLER')}
-            />
-          )}
           <NavItem 
             icon={<ShieldCheck size={15} />} 
             label="ADMIN PANEL" 

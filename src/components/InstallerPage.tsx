@@ -85,7 +85,7 @@ export const InstallerPage: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h2 className="text-xl font-black tracking-widest text-[#00e5ff] uppercase">PASANG DASHBOARD BARU (MULTI-USER)</h2>
+            <h2 className="text-xl font-black tracking-widest text-[#00e5ff] uppercase">INSTALL DASHBOARD BARU (MULTI-USER)</h2>
             <p className="text-xs text-slate-400 font-semibold tracking-wide mt-1">
               Gunakan wizard ini untuk melakukan pendeployan aplikasi mandiri bagi Unit Layanan Pelanggan (UL) baru Anda dengan auto-generate Spreadsheet Master.
             </p>
@@ -235,7 +235,7 @@ export const InstallerPage: React.FC = () => {
                 type="submit"
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-[#070b1e] font-black py-4 rounded-lg text-xs uppercase tracking-widest hover:brightness-110 active:brightness-95 transition-all flex items-center justify-center gap-2"
               >
-                PROSES PASANG DAN DAFTARKAN INSTANSI <ArrowRight size={14} />
+                PROSES INSTAL DAN DAFTARKAN INSTANSI <ArrowRight size={14} />
               </button>
             </form>
           </div>
