@@ -527,11 +527,26 @@ export class GoogleSheetsService {
 
     // Determine official ULPs list beforehand for REGEX-style matching
     const allUlpsOrder = ["BUKITTINGGI", "PADANG PANJANG", "LUBUK BASUNG", "LUBUK SIKAPING", "SIMPANG EMPAT", "BASO", "KOTO TUO"];
-    const allUlps = Array.from(new Set(officers.map(o => {
+    
+    // Build from officers sheet
+    const officersUlps = officers.map(o => {
       let ulpName = (ulpMap.get(o.ulpId) || o.directUlp || "Unknown");
       let standardized = standardizeUlpName(ulpName);
       return getCanonicalUlpName(standardized);
-    }))).filter(u => u !== "UNKNOWN" && isUp3Regu(u))
+    });
+
+    // Build from ULP sheet
+    const ulpSheetUlps = Array.from(ulpMap.values()).map(name => {
+      let standardized = standardizeUlpName(name);
+      return getCanonicalUlpName(standardized);
+    });
+
+    // Merge all with the pre-defined ones to ensure completeness
+    const allUlps = Array.from(new Set([
+      ...allUlpsOrder,
+      ...officersUlps,
+      ...ulpSheetUlps
+    ])).filter(u => u !== "UNKNOWN" && u && isUp3Regu(u))
     .sort((a, b) => {
       const idxA = allUlpsOrder.indexOf(a);
       const idxB = allUlpsOrder.indexOf(b);

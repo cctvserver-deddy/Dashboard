@@ -20,16 +20,19 @@ export const ULPPOStatsCard: React.FC<ULPPOStatsCardProps> = ({ ulpData, onDetai
     "KOTO TUO"
   ];
 
-  // Map data to the requested order, handling potential missing data
-  const sortedData = requestedOrder.map(name => {
-    const found = ulpData.find(d => d.ulp.toUpperCase().includes(name));
-    return found || {
-      ulp: name,
-      jumlahPoTotal: 0,
-      totalPoPakaiCctv: 0,
-      persenPo: "0%"
-    };
-  });
+  // Map data to the requested order, handling potential missing data and appending any other ULPs dynamically
+  const sortedData = [
+    ...requestedOrder.map(name => {
+      const found = ulpData.find(d => d.ulp.toUpperCase().includes(name));
+      return found || {
+        ulp: name,
+        jumlahPoTotal: 0,
+        totalPoPakaiCctv: 0,
+        persenPo: "0%"
+      };
+    }),
+    ...ulpData.filter(d => !requestedOrder.some(name => d.ulp.toUpperCase().includes(name)))
+  ];
 
   return (
     <div className="dashboard-card flex flex-col mt-6 flex-1">
