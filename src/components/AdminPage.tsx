@@ -272,24 +272,154 @@ export const AdminPage: React.FC<{
             let targetCols: number | null = null;
             const upperSheet = sheetName.toUpperCase();
             if (upperSheet === "WO") {
-              targetCols = 42; // Column AP (A=1 ... AP=42)
+              targetCols = 45; // Column AS (A=1 ... AS=45)
             } else if (upperSheet === "PO") {
               targetCols = 23; // Column W (A=1 ... W=23)
             } else if (upperSheet === "CCTV_DATA") {
               targetCols = 6;  // Column F (A=1 ... F=6)
             }
 
+            // CCTV names lookup for WO column AQ auto-fill
+            const cctvNamesSet = new Set<string>();
+            if (upperSheet === "WO") {
+              const cctvRows = MultiuserService.getSheetOverride(selectedAppId, "CCTV_DATA");
+              if (cctvRows && cctvRows.length > 0) {
+                for (let i = 1; i < cctvRows.length; i++) {
+                  const r = cctvRows[i];
+                  if (r && r.length > 1) {
+                    const valB = String(r[1] || "").trim().toUpperCase();
+                    if (valB) {
+                      cctvNamesSet.add(valB);
+                    }
+                  }
+                }
+              }
+            }
+
+            // Date parsing function for WO column AR and AS
+            const parseAndFormatDates = (valP: string) => {
+              if (!valP) return { ar: "", as: "" };
+              let cleanStr = String(valP).trim();
+              let dateObj: Date | null = null;
+
+              if (/^\d{5}(\.\d+)?$/.test(cleanStr)) {
+                const serial = parseFloat(cleanStr);
+                const utcDays = serial - 25569;
+                dateObj = new Date(Math.round(utcDays * 86400 * 1000));
+              } else if (cleanStr.startsWith('Date(')) {
+                const matches = cleanStr.match(/\d+/g);
+                if (matches && matches.length >= 3) {
+                  dateObj = new Date(
+                    parseInt(matches[0]), 
+                    parseInt(matches[1]), 
+                    parseInt(matches[2]),
+                    matches[3] ? parseInt(matches[3]) : 0,
+                    matches[4] ? parseInt(matches[4]) : 0,
+                    matches[5] ? parseInt(matches[5]) : 0
+                  );
+                }
+              } else {
+                const spaceSplit = cleanStr.split(/\s+/);
+                const datePart = spaceSplit[0];
+                const timePart = spaceSplit[1] || "";
+                
+                const dateParts = datePart.split(/[-/.]/);
+                if (dateParts.length === 3) {
+                  let d = parseInt(dateParts[0]);
+                  let m = parseInt(dateParts[1]);
+                  let y = parseInt(dateParts[2]);
+                  
+                  if (dateParts[0].length === 4) {
+                    y = parseInt(dateParts[0]);
+                    m = parseInt(dateParts[1]);
+                    d = parseInt(dateParts[2]);
+                  } else if (y < 100) {
+                    y += y > 70 ? 1900 : 2000;
+                  }
+                  
+                  let hh = 0, mmVal = 0, ss = 0;
+                  if (timePart) {
+                    const timeParts = timePart.split(/[:.]/);
+                    if (timeParts.length >= 2) {
+                      hh = parseInt(timeParts[0]);
+                      mmVal = parseInt(timeParts[1]);
+                      ss = timeParts[2] ? parseInt(timeParts[2]) : 0;
+                    }
+                  }
+                  
+                  if (!isNaN(y) && !isNaN(m) && !isNaN(d) && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+                    const testDate = new Date(y, m - 1, d, hh, mmVal, ss);
+                    if (!isNaN(testDate.getTime())) {
+                      dateObj = testDate;
+                    }
+                  }
+                }
+              }
+
+              if (!dateObj) {
+                const parsed = new Date(valP);
+                if (!isNaN(parsed.getTime())) {
+                  dateObj = parsed;
+                }
+              }
+
+              if (!dateObj || isNaN(dateObj.getTime())) {
+                return { ar: "", as: "" };
+              }
+
+              const idMonths = [
+                "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+              ];
+
+              const day = String(dateObj.getDate()).padStart(2, '0');
+              const monthName = idMonths[dateObj.getMonth()];
+              const year = dateObj.getFullYear();
+              const arFormatted = `${day} ${monthName} ${year}`;
+
+              const monthNum = String(dateObj.getMonth() + 1).padStart(2, '0');
+              const hh = String(dateObj.getHours()).padStart(2, '0');
+              const min = String(dateObj.getMinutes()).padStart(2, '0');
+              const ss = String(dateObj.getSeconds()).padStart(2, '0');
+              const asFormatted = `${day}/${monthNum}/${year} ${hh}:${min}:${ss}`;
+
+              return { ar: arFormatted, as: asFormatted };
+            };
+
             if (targetCols !== null) {
-              finalRows = finalRows.map(row => {
-                if (row.length > targetCols!) {
-                  return row.slice(0, targetCols!);
+              finalRows = finalRows.map((row, idx) => {
+                let cleaned = Array.isArray(row) ? [...row] : [];
+                if (cleaned.length > targetCols!) {
+                  cleaned = cleaned.slice(0, targetCols!);
                 } else {
-                  const cleaned = [...row];
                   while (cleaned.length < targetCols!) {
                     cleaned.push("");
                   }
-                  return cleaned;
                 }
+
+                if (upperSheet === "WO") {
+                  if (idx === 0) {
+                    cleaned[42] = "CCTV_STATUS";
+                    cleaned[43] = "TGL_DAPEN_INDO";
+                    cleaned[44] = "TGL_DAPEN_STANDARD";
+                  } else {
+                    // AQ Column (Index 42) - If Column N (index 13) === Column B in CCTV_DATA
+                    const valN = String(cleaned[13] || "").trim().toUpperCase();
+                    if (valN && cctvNamesSet.has(valN)) {
+                      cleaned[42] = "CCTV";
+                    } else {
+                      cleaned[42] = "";
+                    }
+
+                    // AR Column (Index 43) & AS Column (Index 44) - Based on Column P (index 15)
+                    const valP = String(cleaned[15] || "").trim();
+                    const formatted = parseAndFormatDates(valP);
+                    cleaned[43] = formatted.ar;
+                    cleaned[44] = formatted.as;
+                  }
+                }
+
+                return cleaned;
               });
             }
 
