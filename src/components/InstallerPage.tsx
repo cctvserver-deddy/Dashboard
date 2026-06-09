@@ -172,7 +172,7 @@ export const InstallerPage: React.FC = () => {
                   <label className="block text-[10px] font-black text-slate-300 tracking-wider uppercase mb-2">NAMA UNIT LAYANAN (UL) BARU</label>
                   <input
                     type="text"
-                    placeholder="Contoh: UL PADANG, UL SOLOK, UL BASO"
+                    placeholder="Contoh: UL PADANG, UL SOLOK, UL PAYAKUMBUH"
                     value={ulName}
                     onChange={(e) => setUlName(e.target.value)}
                     required
