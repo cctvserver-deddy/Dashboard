@@ -103,16 +103,6 @@ export const AdminPage: React.FC<{
     setSheetPreviews({});
   };
 
-  // Toggle Activation (Sadmin Feature)
-  const handleToggleActivation = (id: string, currentStatus: string) => {
-    const isNowActive = currentStatus !== "active";
-    const success = MultiuserService.activateApplication(id, isNowActive);
-    if (success) {
-      // Reload apps list
-      setApps(MultiuserService.getApplications());
-    }
-  };
-
   // Delete App (Sadmin Feature)
   const handleDeleteApp = (id: string) => {
     if (id === "master") return;
@@ -977,7 +967,6 @@ export const AdminPage: React.FC<{
                 <th className="p-3.5">ID / Unit Kerja</th>
                 <th className="p-3.5">Spreadsheet ID</th>
                 <th className="p-3.5">Web Apps GAS Link</th>
-                <th className="p-3.5">Status Aktivasi</th>
                 <th className="p-3.5 text-center">Tindakan Kontrol</th>
               </tr>
             </thead>
@@ -1005,53 +994,25 @@ export const AdminPage: React.FC<{
                     )}
                   </td>
                   <td className="p-3.5">
-                    {app.id === "master" ? (
-                      <span className="px-2 py-1 rounded bg-green-500/10 text-green-400 font-black text-[9px] uppercase tracking-wider inline-flex items-center gap-1 border border-green-500/20">
-                        <Check size={10} /> SELALU AKTIF
-                      </span>
-                    ) : app.status === "active" ? (
-                      <span className="px-2 py-1 rounded bg-green-500/20 text-[#00e5ff] font-black text-[9px] uppercase tracking-wider inline-flex items-center gap-1 border border-cyan-500/20 animate-pulse">
-                        <Check size={10} /> AKTIF & JALAN
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 rounded bg-red-500/20 text-red-400 font-black text-[9px] uppercase tracking-wider inline-flex items-center gap-1 border border-red-500/20">
-                        🔒 DIKUNCI / TERTUNDA
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3.5">
                     <div className="flex items-center justify-center gap-2">
                       {app.id !== "master" && (
-                        <>
-                          <button
-                            onClick={() => handleToggleActivation(app.id, app.status)}
-                            className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider border transition-all ${
-                              app.status === "active"
-                                ? "bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border-yellow-500/20"
-                                : "bg-green-500/10 hover:bg-green-500/20 text-green-400 border-green-500/20"
-                            }`}
-                          >
-                            {app.status === "active" ? "Non-Aktifkan" : "Aktifkan"}
-                          </button>
-                          
-                          <button
-                            onClick={() => handleDeleteApp(app.id)}
-                            className="p-1.5 rounded hover:bg-red-500/20 text-red-400 border border-transparent hover:border-red-500/20 transition-all"
-                            title="Hapus Link Aktivasi"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </>
+                        <button
+                          onClick={() => handleDeleteApp(app.id)}
+                          className="bg-red-500/10 hover:bg-red-500/20 text-red-400 p-2 rounded transition-all border border-red-500/10 flex items-center gap-1.5 font-bold text-[10px] uppercase cursor-pointer"
+                          title="Hapus Unit Kerja"
+                        >
+                          <Trash2 size={13} /> Hapus
+                        </button>
                       )}
                       
                       <a
                         href={`${window.location.origin}/?appId=${app.id}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded transition-colors border border-slate-700"
+                        className="bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] p-2 rounded transition-colors border border-[#00e5ff]/20 flex items-center gap-1.5 font-bold text-[10px] uppercase cursor-pointer"
                         title="Buka Link Aplikasi"
                       >
-                        <ExternalLink size={14} />
+                        <ExternalLink size={13} /> Buka
                       </a>
                     </div>
                   </td>
