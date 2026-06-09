@@ -43,9 +43,9 @@ export const AdminPage: React.FC<{
       CCTV_DATA: "No,Nama CCTV,Unit,Tipe,Status\n1,CCTV POSKO GADUT,UL BUKITTINGGI,IP CAMERA,ONLINE",
       WO: "No Laporan,Tgl Lapor,Nama Petugas,ULP,Posko,Nama Regu,APKT Status,RPT,RCT,Durasi WO,CCTV,Source,Rating,Check In Petugas,Tgl Penugasan Regu,Tgl Dalam Perjalanan,Tgl Nyala,Check Out Petugas,Shift\nL12345,08/06/2026 08:00:00,AHMAD,ULP BUKITTINGGI,POSKO BUKITTINGGI,BUKITTINGGI,SELESAI,15,30,45,CCTV AKTIF,PLN MOBILE,5,08/06/2026 08:05:00,08/06/2026 08:01:00,08/06/2026 08:10:00,08/06/2026 08:25:00,08/06/2026 08:35:00,PAGI",
       PO: "No Tugas,Tgl,Nama Petugas,ULP,Posko,Nama Regu,CCTV\nT98765,08/06/2026 09:15:00,BUDI,ULP PADANG PANJANG,POSKO PADANG PANJANG,PADANGPANJANG,CCTV AKTIF",
-      POSKO: "Posko,PoskoId,Ulp_Id\nPOSKO BUKITTINGGI,1,1\nPOSKO PADANG PANJANG,2,2",
-      PETUGAS: "Name,UlpId,Ulp\nAHMAD,1,UL BUKITTINGGI\nBUDI,2,UL PADANG PANJANG",
-      ULP: "Id,Name\n1,UL BUKITTINGGI\n2,UL PADANG PANJANG"
+      POSKO: "id,name\np1,POSKO ULP BUKITTINGGI\np2,POSKO ULP PADANG PANJANG",
+      PETUGAS: "id,name,ulpId\nk1,13226_AZWARDI,u1\nk2,AHMAD,u1\nk3,BUDI,u2",
+      ULP: "id,name,poskoId\nu1,BUKITTINGGI,p1\nu2,PADANG PANJANG,p2"
     };
 
     const csvContent = templates[sheetName] || "";

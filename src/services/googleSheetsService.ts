@@ -246,6 +246,10 @@ export class GoogleSheetsService {
           idx = row.findIndex(h => (h.includes("nama") && h.includes("petugas")) || h === "petugas" || h === "name" || h === "nama");
         } else if (t === "cctv") {
           idx = row.findIndex(h => h === "cctv" || h.includes("cctv"));
+        } else if (t === "ulpid" || t === "ulp_id" || t === "ulp id") {
+          idx = row.findIndex(h => h === "ulpid" || h === "ulp_id" || h === "ulp id" || (h.includes("ulp") && h.includes("id")));
+        } else if (t === "poskoid" || t === "poskold" || t === "posko_id" || t === "posko id") {
+          idx = row.findIndex(h => h === "poskoid" || h === "poskold" || h === "posko_id" || h === "posko id" || (h.includes("posko") && (h.includes("id") || h.includes("ld"))));
         } else if (t === "ulp") {
           idx = row.findIndex(h => h === "ulp" || h.includes("ulp") || h === "unit" || h === "posko" || h.includes("posko"));
         } else if (t === "tgl lapor") {
@@ -259,8 +263,6 @@ export class GoogleSheetsService {
           idx = row.findIndex(h => h === "tanggal" || h.includes("tanggal") || h.includes("date") || h.includes("tgl"));
         } else if (t === "no laporan" || t === "no tugas") {
           idx = row.findIndex(h => (h.includes("no") && (h.includes("lap") || h.includes("tug"))) || h === "id" || h.includes("laporan id") || h.includes("id laporan") || h.includes("task id") || h.includes("id tugas"));
-        } else if (t === "ulp" || t === "ulp id" || t === "ulpid") {
-          idx = row.findIndex(h => h === "ulp" || h === "ulpid" || h === "ulp_id" || h === "ulp id" || h.includes("ulp") || h === "unit" || h === "posko" || h.includes("posko"));
         } else if (t === "apkt status" || t === "status apkt") {
           idx = row.findIndex(h => h.toLowerCase().includes("status") && h.toLowerCase().includes("apkt"));
         } else if (t === "nama regu") {
@@ -409,24 +411,80 @@ export class GoogleSheetsService {
 
     // 1. Get ULP, POSKO and Petugas data for mapping
     const ulpMap = new Map<string, string>();
-    const { headerRowIdx: ulpHeaderIdx, colIndices: ulpCols } = this.findHeaderAndCols(ulpRows, ["id", "name"]);
+    const poskoIdToUlpIdMapFromUlpSheet = new Map<string, string>(); // poskoId -> ulpId
+
+    const { headerRowIdx: ulpHeaderIdx, colIndices: ulpCols } = this.findHeaderAndCols(ulpRows, ["id", "name", "poskoid"]);
     if (ulpCols[0] !== -1 && ulpCols[1] !== -1) {
       ulpRows.slice(ulpHeaderIdx + 1).forEach(row => {
         const id = String(row[ulpCols[0]] || "").trim();
         const name = String(row[ulpCols[1]] || "").trim();
         if (id && name) ulpMap.set(id, name);
+        
+        if (ulpCols[2] !== -1 && ulpCols[2] < row.length) {
+          const poskoId = String(row[ulpCols[2]] || "").trim();
+          if (poskoId && id) {
+            poskoIdToUlpIdMapFromUlpSheet.set(poskoId, id);
+          }
+        }
       });
     }
 
     const poskoToUlpIdMap = new Map<string, string>();
+    const poskoIdToNameMap = new Map<string, string>();
+    const poskoNameToIdMap = new Map<string, string>();
+
     const { headerRowIdx: poskoHeaderIdx, colIndices: poskoCols } = this.findHeaderAndCols(poskoRows, ["posko", "poskoid", "ulp_id"]);
-    if (poskoCols[0] !== -1) {
+    
+    let isNewFormat = false;
+    if (poskoCols[0] === -1) {
+      // Try parsing with new "id" and "name" layout (e.g. uploaded via CSV template)
+      const { headerRowIdx: newHeaderIdx, colIndices: newCols } = this.findHeaderAndCols(poskoRows, ["name", "id"]);
+      if (newCols[0] !== -1 && newCols[1] !== -1) {
+        isNewFormat = true;
+        const nameIdx = newCols[0];
+        const idIdx = newCols[1];
+        
+        poskoRows.slice(newHeaderIdx + 1).forEach(row => {
+          const poskoNameRaw = String(row[nameIdx] || "").trim();
+          const poskoName = this.normalizeForMatch(poskoNameRaw);
+          const rawId = String(row[idIdx] || "").trim();
+          
+          if (poskoName && rawId) {
+            poskoIdToNameMap.set(rawId, poskoNameRaw);
+            poskoNameToIdMap.set(poskoName, rawId);
+          }
+
+          // Backwards compatibility fallback of digits from ID
+          const digitMatch = rawId.match(/\d+/);
+          const ulpId = digitMatch ? digitMatch[0] : rawId;
+          
+          if (poskoName && ulpId) {
+            poskoToUlpIdMap.set(poskoName, ulpId);
+          }
+          if (poskoName && rawId && rawId !== ulpId) {
+            poskoToUlpIdMap.set(poskoName, rawId);
+          }
+         });
+      }
+    }
+
+    if (!isNewFormat && poskoCols[0] !== -1) {
       poskoRows.slice(poskoHeaderIdx + 1).forEach(row => {
-        const poskoName = this.normalizeForMatch(String(row[poskoCols[0]] || ""));
+        const poskoNameRaw = String(row[poskoCols[0]] || "").trim();
+        const poskoName = this.normalizeForMatch(poskoNameRaw);
         const ulpId = String(row[poskoCols[1]] !== undefined ? row[poskoCols[1]] : (row[poskoCols[2]] || "")).trim();
         if (poskoName && ulpId) poskoToUlpIdMap.set(poskoName, ulpId);
       });
     }
+
+    // Connect POSKO to ULP using ULP sheet's relation (poskoId -> ulpId)
+    poskoIdToNameMap.forEach((name, poskoId) => {
+      const ulpId = poskoIdToUlpIdMapFromUlpSheet.get(poskoId);
+      if (ulpId) {
+        const normName = this.normalizeForMatch(name);
+        poskoToUlpIdMap.set(normName, ulpId);
+      }
+    });
 
     const { headerRowIdx: petugasHeaderIdx, colIndices: petugasCols } = this.findHeaderAndCols(petugasRows, ["name", "ulpId", "ulp"]);
     const officers: { name: string; ulpId: string; directUlp: string }[] = [];
