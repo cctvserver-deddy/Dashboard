@@ -87,10 +87,7 @@ export default function App() {
 
         // Fetch refreshed status
         app = MultiuserService.getApplication(id);
-        if (app && app.status !== "active") {
-          setIsAppPending(true);
-          setActiveApp(app);
-        } else if (app) {
+        if (app) {
           setIsAppPending(false);
           setActiveApp(app);
         }
