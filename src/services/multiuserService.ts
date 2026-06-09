@@ -290,13 +290,26 @@ export class MultiuserService {
 
   /**
    * Register a new sub-app. Initially "pending" status as requested
+   * Fetches the global registered list first to avoid overwriting existing apps from other browsers.
    */
-  public static registerApplication(ulName: string, driveLink: string, gasWebUrl: string = ""): AppInstance {
+  public static async registerApplication(ulName: string, driveLink: string, gasWebUrl: string = ""): Promise<AppInstance> {
     const rawName = String(ulName || "").trim().toUpperCase();
     const id = this.generateAppIdFromUlName(rawName);
     const spreadsheetId = this.extractSpreadsheetId(driveLink);
 
-    const apps = this.getApplications();
+    // Fetch latest remote applications first to merge rather than overwrite
+    let apps: AppInstance[] = [];
+    try {
+      apps = await this.fetchRemoteApplications();
+    } catch (e) {
+      console.error("Failed to fetch remote apps prior to registration:", e);
+      apps = this.getApplications();
+    }
+
+    if (!apps.some(app => app.id === "master")) {
+      apps.unshift(this.MASTER_APP);
+    }
+
     const existingIndex = apps.findIndex(app => app.id === id);
 
     const newApp: AppInstance = {
@@ -309,13 +322,19 @@ export class MultiuserService {
     };
 
     if (existingIndex !== -1) {
-      // Overwrite/Update existing instance to avoid duplicate ID issues
+      // Overwrite/Update existing instance to avoid duplicate ID issues while preserving status if already active
+      newApp.status = apps[existingIndex].status === "active" ? "active" : "pending";
       apps[existingIndex] = newApp;
     } else {
       apps.push(newApp);
     }
 
-    this.saveApplications(apps);
+    // Save to local storage
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(apps));
+
+    // Push full, merged list back to the remote AKTIVASI sheet
+    await this.pushApplicationsToRemote(apps);
+
     return newApp;
   }
 
@@ -376,6 +395,35 @@ export class MultiuserService {
   }
 
   /**
+   * Pushes specific sheet's parsed CSV rows to Google Sheets using Apps Script
+   */
+  public static async pushSheetToRemote(appId: string, sheetName: string, rows: any[][]): Promise<boolean> {
+    const app = this.getApplication(appId);
+    if (!app || !app.gasWebUrl || app.gasWebUrl.includes("sample")) {
+      return false;
+    }
+
+    try {
+      await fetch(app.gasWebUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain"
+        },
+        body: JSON.stringify({
+          sheet: sheetName,
+          rows: rows,
+          append: false
+        })
+      });
+      return true;
+    } catch (e) {
+      console.error(`Failed to push sheet ${sheetName} to remote:`, e);
+      return false;
+    }
+  }
+
+  /**
    * Dynamically replace all "Bukittinggi" / "BUKITTINGGI" references in text with custom UL Name
    */
   public static replaceBrandingText(text: string, currentUlName: string): string {
@@ -424,6 +472,18 @@ const UNIT_WILAYAH = "UL ${customUl}";
 function doGet(e) {
   const sheetName = e && e.parameter && e.parameter.sheet ? e.parameter.sheet : "";
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Auto-clean: Hapus Sheet/Tab AKTIVASI agar tidak ikut terduplikasi di spreadsheet unit baru yang dideploy
+  if (UNIT_WILAYAH !== "MASTER" && !UNIT_WILAYAH.includes("BUKITTINGGI")) {
+    const aktivasiSheet = spreadsheet.getSheetByName("AKTIVASI");
+    if (aktivasiSheet) {
+      try {
+        spreadsheet.deleteSheet(aktivasiSheet);
+      } catch (err) {
+        // ignore
+      }
+    }
+  }
   
   if (!sheetName) {
     return ContentService.createTextOutput(JSON.stringify({ 

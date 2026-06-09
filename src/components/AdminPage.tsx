@@ -3,7 +3,7 @@ import { MultiuserService, AppInstance } from '../services/multiuserService.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Lock, KeyRound, Upload, CheckCircle, AlertCircle, FileSpreadsheet, Download,
-  Trash2, ShieldCheck, RefreshCw, Power, ExternalLink, Columns, ChevronDown, Check, Eye
+  Trash2, ShieldCheck, RefreshCw, Power, ExternalLink, Columns, ChevronDown, Check, Eye, Cloud
 } from 'lucide-react';
 import Papa from 'papaparse';
 
@@ -29,6 +29,8 @@ export const AdminPage: React.FC<{
   const [uploadSuccess, setUploadSuccess] = useState<Record<string, string>>({});
   const [sheetPreviews, setSheetPreviews] = useState<Record<string, { headers: string[], rows: any[][] }>>({});
   const [showPreviewModal, setShowPreviewModal] = useState<string | null>(null);
+  const [syncingState, setSyncingState] = useState<Record<string, 'idle' | 'syncing' | 'success' | 'error'>>({});
+  const [syncMessage, setSyncMessage] = useState<Record<string, string>>({});
 
   // New unit manually added form states (Sadmin features)
   const [showAddUnitForm, setShowAddUnitForm] = useState(false);
@@ -120,6 +122,65 @@ export const AdminPage: React.FC<{
     }
   };
 
+  // Update Apps Script URL for active selected unit
+  const handleUpdateGasUrl = (newUrl: string) => {
+    const list = [...apps];
+    const idx = list.findIndex(a => a.id === selectedAppId);
+    if (idx !== -1) {
+      list[idx].gasWebUrl = newUrl.trim();
+      MultiuserService.saveApplications(list);
+      setApps(list);
+      alert(`Berhasil memperbarui Link Web App GAS untuk unit: UL ${list[idx].ulName}!`);
+    } else {
+      alert("Gagal memperbarui: Unit tidak ditemukan.");
+    }
+  };
+
+  // Synchronization helper
+  const handleSyncToSheets = async (sheetName: string) => {
+    const app = apps.find(a => a.id === selectedAppId);
+    if (!app) {
+      alert("Aplikasi unit sasaran tidak ditemukan.");
+      return;
+    }
+
+    const csvOverride = localStorage.getItem(`pln_sheet_override_${selectedAppId}_${sheetName.toUpperCase()}`);
+    if (!csvOverride) {
+      alert("Tidak ada data unggahan lokal untuk disinkronkan.");
+      return;
+    }
+
+    if (!app.gasWebUrl || app.gasWebUrl.includes("sample")) {
+      alert("Tautan Google Apps Script (Web App GAS) belum dikonfigurasi untuk unit ini. Silakan masukkan tautan GAS Web App Anda di bagian panel unit di kiri terlebih dahulu.");
+      return;
+    }
+
+    setSyncingState(prev => ({ ...prev, [sheetName]: 'syncing' }));
+
+    try {
+      const parsed = Papa.parse(csvOverride, {
+        header: false,
+        skipEmptyLines: true
+      });
+      const dataRows = parsed.data as any[][];
+
+      const success = await MultiuserService.pushSheetToRemote(selectedAppId, sheetName, dataRows);
+      if (success) {
+        setSyncingState(prev => ({ ...prev, [sheetName]: 'success' }));
+        setSyncMessage(prev => ({ ...prev, [sheetName]: "Berhasil disinkronkan ke Google Sheet!" }));
+        alert(`Berhasil melakukan sinkronisasi tab '${sheetName}' langsung ke Google Sheet Anda!`);
+      } else {
+        setSyncingState(prev => ({ ...prev, [sheetName]: 'error' }));
+        setSyncMessage(prev => ({ ...prev, [sheetName]: "Gagal sinkron remote. Periksa URL GAS Anda." }));
+        alert(`Gagal mengirim data ke Google Sheet. Pastikan Anda telah mendeploy Apps Script sebagai Web App milik sendiri dengan hak akses 'Anyone / Siapa Saja'.`);
+      }
+    } catch (err: any) {
+      setSyncingState(prev => ({ ...prev, [sheetName]: 'error' }));
+      setSyncMessage(prev => ({ ...prev, [sheetName]: err?.message || "Koneksi Bermasalah" }));
+      alert(`Gagal mengirim data: ${err?.message || err}`);
+    }
+  };
+
   // Manual Add Unit (Sadmin Feature)
   const handleManualAddUnit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +245,28 @@ export const AdminPage: React.FC<{
                 ...prev,
                 [sheetName]: { headers, rows: rows.slice(0, 5) } // Store first 5 rows as preview
               }));
+
+              // Auto-sync in background to Google Sheet if GAS URL is set
+              const currentApp = apps.find(a => a.id === selectedAppId);
+              if (currentApp && currentApp.gasWebUrl && !currentApp.gasWebUrl.includes("sample")) {
+                setSyncingState(p => ({ ...p, [sheetName]: 'syncing' }));
+                MultiuserService.pushSheetToRemote(selectedAppId, sheetName, dataRows)
+                  .then(synced => {
+                    if (synced) {
+                      setSyncingState(p => ({ ...p, [sheetName]: 'success' }));
+                      setSyncMessage(p => ({ ...p, [sheetName]: "Sinkronisasi otomatis berhasil masuk ke Google Sheet!" }));
+                    } else {
+                      setSyncingState(p => ({ ...p, [sheetName]: 'error' }));
+                      setSyncMessage(p => ({ ...p, [sheetName]: "Gagal sinkronisasi otomatis. Klik tombol 'Sync ke Sheet'!" }));
+                    }
+                  })
+                  .catch(() => {
+                    setSyncingState(p => ({ ...p, [sheetName]: 'error' }));
+                    setSyncMessage(p => ({ ...p, [sheetName]: "Gagal menghubungi Apps Script." }));
+                  });
+              } else {
+                setSyncMessage(p => ({ ...p, [sheetName]: "Tersimpan di lokal. Atur Link Web App GAS di kiri untuk sinkronisasi otomatis." }));
+              }
             } else {
               alert("Gagal menyimpan data override ke penyimpanan lokal.");
             }
@@ -361,15 +444,52 @@ export const AdminPage: React.FC<{
 
               {selectedApp && (
                 <div className="bg-[#070b1e] rounded-lg p-3 border border-slate-800 space-y-2 text-[11px] text-slate-400 font-medium">
-                  <div className="flex justify-between border-b border-slate-900 pb-1.5">
+                  <div className="flex justify-between border-b border-slate-900 pb-1.5 font-bold">
                     <span>Unit Kerja</span>
                     <strong className="text-white">UL {selectedApp.ulName}</strong>
                   </div>
-                  <div className="flex justify-between border-b border-slate-900 pb-1.5">
+                  <div className="flex justify-between border-b border-slate-900 pb-1.5 font-bold">
                     <span>Spreadsheet ID</span>
                     <span className="font-mono text-cyan-400 shrink-0 text-[10px] bg-cyan-950/40 px-1.5 py-0.5 rounded truncate max-w-[150px]">
                       {selectedApp.spreadsheetId}
                     </span>
+                  </div>
+                  <div className="border-b border-slate-900 pb-1.5 space-y-1 font-bold">
+                    <div className="flex justify-between">
+                      <span>Web App GAS URL</span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded uppercase ${
+                        selectedApp.gasWebUrl && !selectedApp.gasWebUrl.includes("sample") 
+                          ? "bg-green-500/20 text-green-400" 
+                          : "bg-red-500/20 text-red-400"
+                      }`}>
+                        {selectedApp.gasWebUrl && !selectedApp.gasWebUrl.includes("sample") ? "Terkonek" : "Belum Set"}
+                      </span>
+                    </div>
+                    <div className="flex gap-1.5 mt-1">
+                      <input
+                        type="text"
+                        placeholder="Paste link Web App GAS..."
+                        defaultValue={selectedApp.gasWebUrl && !selectedApp.gasWebUrl.includes("sample") ? selectedApp.gasWebUrl : ""}
+                        id="selected-app-gas-input"
+                        className="flex-1 bg-black/40 border border-slate-800 rounded px-2 py-1 text-[10px] text-white font-mono placeholder-slate-700 focus:outline-none focus:border-cyan-500"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const val = (document.getElementById("selected-app-gas-input") as HTMLInputElement)?.value || "";
+                            handleUpdateGasUrl(val);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = (document.getElementById("selected-app-gas-input") as HTMLInputElement)?.value || "";
+                          handleUpdateGasUrl(val);
+                        }}
+                        className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-black px-2 py-1 rounded text-[9px] uppercase tracking-widest transition-colors shrink-0"
+                      >
+                        Simpan
+                      </button>
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span>Link Hubungan</span>
@@ -454,10 +574,46 @@ export const AdminPage: React.FC<{
                               : "🔗 Standard - Membaca langsung dari Google Sheet utama."
                             }
                           </p>
+                          {isOverridden && syncMessage[sheet.name] && (
+                            <p className={`text-[10px] font-bold mt-1 flex items-center gap-1 leading-snug ${
+                              syncingState[sheet.name] === 'success' 
+                                ? 'text-emerald-400' 
+                                : syncingState[sheet.name] === 'error'
+                                ? 'text-rose-400'
+                                : 'text-amber-400'
+                            }`}>
+                              <span className="opacity-90">Status G-Sheet:</span> {syncMessage[sheet.name]}
+                            </p>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 self-stretch sm:self-auto w-full sm:w-auto">
+                      <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto w-full sm:w-auto">
+                        {isOverridden && (
+                          <button
+                            onClick={() => handleSyncToSheets(sheet.name)}
+                            disabled={syncingState[sheet.name] === 'syncing'}
+                            className={`p-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 shrink-0 ${
+                              syncingState[sheet.name] === 'syncing'
+                                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500 cursor-not-allowed animate-pulse'
+                                : syncingState[sheet.name] === 'success'
+                                ? 'bg-emerald-500/20 border border-emerald-500/35 text-emerald-400 hover:bg-emerald-500/30'
+                                : 'bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-black'
+                            }`}
+                            title="Simpan & Sinkronisasikan Data ini Langsung ke Google Sheet"
+                          >
+                            {syncingState[sheet.name] === 'syncing' ? (
+                              <>
+                                <RefreshCw size={14} className="animate-spin" /> Syncing...
+                              </>
+                            ) : (
+                              <>
+                                <Cloud size={14} /> Sync ke Sheet
+                              </>
+                            )}
+                          </button>
+                        )}
+
                         {isOverridden && (
                           <button
                             onClick={() => {
@@ -489,13 +645,13 @@ export const AdminPage: React.FC<{
                         <label className="flex-1 sm:flex-none cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase text-center transition-all flex items-center justify-center gap-1 shrink-0">
                           <Upload size={12} /> Pilih file CSV
                           <input
-                            type="file"
-                            accept=".csv"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleFileUpload(sheet.name, file);
-                            }}
-                            className="hidden"
+                             type="file"
+                             accept=".csv"
+                             onChange={(e) => {
+                               const file = e.target.files?.[0];
+                               if (file) handleFileUpload(sheet.name, file);
+                             }}
+                             className="hidden"
                           />
                         </label>
 
