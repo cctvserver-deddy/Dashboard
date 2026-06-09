@@ -404,6 +404,31 @@ export class MultiuserService {
     }
 
     try {
+      // Robustly normalize 2D array to a perfect rectangular matrix (equal columns per row) 
+      // preventing setValues() errors in Google Apps Script due to variable column lengths
+      let maxCols = 0;
+      const sanitizedRows = rows.map(r => {
+        if (!Array.isArray(r)) return [];
+        const cleanedRow = r.map(cell => {
+          if (cell === null || cell === undefined) return "";
+          return String(cell);
+        });
+        if (cleanedRow.length > maxCols) maxCols = cleanedRow.length;
+        return cleanedRow;
+      }).filter(r => r.length > 0);
+
+      const rectangularRows = sanitizedRows.map(cleanedRow => {
+        const paddedRow = [...cleanedRow];
+        while (paddedRow.length < maxCols) {
+          paddedRow.push("");
+        }
+        return paddedRow;
+      });
+
+      if (rectangularRows.length === 0) {
+        return false;
+      }
+
       await fetch(app.gasWebUrl, {
         method: "POST",
         mode: "no-cors",
@@ -412,7 +437,7 @@ export class MultiuserService {
         },
         body: JSON.stringify({
           sheet: sheetName,
-          rows: rows,
+          rows: rectangularRows,
           append: false
         })
       });

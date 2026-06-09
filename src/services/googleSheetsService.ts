@@ -243,7 +243,9 @@ export class GoogleSheetsService {
         if (idx !== -1) return idx;
         
         if (t === "nama petugas" || t === "name") {
-          idx = row.findIndex(h => (h.includes("nama") && h.includes("petugas")) || h === "petugas" || h === "name" || h === "nama");
+          idx = row.findIndex(h => (h.includes("nama") && h.includes("petugas")) || h === "petugas" || h === "name" || h === "nama" || h.includes("personil") || h.includes("yantek"));
+        } else if (t === "shift") {
+          idx = row.findIndex(h => h === "shift" || h === "shif" || h.includes("shift") || h.includes("shif"));
         } else if (t === "cctv") {
           idx = row.findIndex(h => h === "cctv" || h.includes("cctv"));
         } else if (t === "ulpid" || t === "ulp_id" || t === "ulp id") {

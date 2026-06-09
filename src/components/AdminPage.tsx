@@ -31,6 +31,7 @@ export const AdminPage: React.FC<{
   const [showPreviewModal, setShowPreviewModal] = useState<string | null>(null);
   const [syncingState, setSyncingState] = useState<Record<string, 'idle' | 'syncing' | 'success' | 'error'>>({});
   const [syncMessage, setSyncMessage] = useState<Record<string, string>>({});
+  const [testConnectionStatus, setTestConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
   // New unit manually added form states (Sadmin features)
   const [showAddUnitForm, setShowAddUnitForm] = useState(false);
@@ -133,6 +134,37 @@ export const AdminPage: React.FC<{
       alert(`Berhasil memperbarui Link Web App GAS untuk unit: UL ${list[idx].ulName}!`);
     } else {
       alert("Gagal memperbarui: Unit tidak ditemukan.");
+    }
+  };
+
+  // Test current GAS Web App connectivity
+  const handleTestGasConnection = async () => {
+    const app = apps.find(a => a.id === selectedAppId);
+    if (!app || !app.gasWebUrl || app.gasWebUrl.includes("sample")) {
+      alert("Silakan masukkan URL Web App GAS yang valid terlebih dahulu.");
+      return;
+    }
+
+    setTestConnectionStatus("testing");
+    try {
+      const res = await fetch(app.gasWebUrl, { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      const data = await res.json();
+      if (data && data.status === "connected") {
+        alert(`Koneksi Sukses!\n\nUnit: ${data.unit}\nTab yang ada di Google Sheet:\n${data.sheets ? data.sheets.join(", ") : "Tidak ada tab"}`);
+        setTestConnectionStatus("success");
+      } else if (data && data.error) {
+        alert(`Koneksi Gagal: ${data.error}`);
+        setTestConnectionStatus("error");
+      } else {
+        alert("Respon tidak dikenal dari Google Apps Script.");
+        setTestConnectionStatus("error");
+      }
+    } catch (err: any) {
+      alert(`Koneksi Gagal!\n\nPastikan:\n1. URL Web App GAS yang Anda masukkan tidak salah.\n2. Anda telah melakukan redeploy Apps Script (New Deployment) dengan akses 'Anyone' (Siapa Saja).\n3. Anda sudah meng-Authorize akses di Apps Script saat melakukan deploy.\n\nDetail Error: ${err.message || err}`);
+      setTestConnectionStatus("error");
     }
   };
 
@@ -490,6 +522,22 @@ export const AdminPage: React.FC<{
                         Simpan
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      onClick={handleTestGasConnection}
+                      disabled={testConnectionStatus === 'testing'}
+                      className={`w-full mt-1.5 px-2 bg-slate-800 hover:bg-slate-700 py-1 border border-slate-700 rounded text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 shrink-0 ${
+                        testConnectionStatus === 'testing'
+                          ? 'border-amber-500/30 text-amber-500 bg-amber-500/5 animate-pulse'
+                          : testConnectionStatus === 'success'
+                          ? 'border-green-500/30 text-green-400 bg-green-500/5 hover:bg-green-500/10'
+                          : testConnectionStatus === 'error'
+                          ? 'border-red-500/30 text-red-400 bg-red-500/5 hover:bg-red-500/10'
+                          : 'text-slate-300'
+                      }`}
+                    >
+                      {testConnectionStatus === 'testing' ? 'Menguji Koneksi...' : '🔌 Cek Koneksi ke Google Sheet'}
+                    </button>
                   </div>
                   <div className="flex justify-between">
                     <span>Link Hubungan</span>
