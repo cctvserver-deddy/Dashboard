@@ -263,11 +263,42 @@ export const AdminPage: React.FC<{
         complete: (results) => {
           if (results.data && results.data.length > 0) {
             const dataRows = results.data as any[][];
-            const headers = dataRows[0].map(h => String(h || "").trim());
-            const rows = dataRows.slice(1);
+            
+            // Limit and pad columns based on sheetName
+            let finalRows = dataRows.map(row => {
+              return Array.isArray(row) ? row.map(cell => cell === null || cell === undefined ? "" : String(cell)) : [];
+            });
+            
+            let targetCols: number | null = null;
+            const upperSheet = sheetName.toUpperCase();
+            if (upperSheet === "WO") {
+              targetCols = 42; // Column AP (A=1 ... AP=42)
+            } else if (upperSheet === "PO") {
+              targetCols = 23; // Column W (A=1 ... W=23)
+            } else if (upperSheet === "CCTV_DATA") {
+              targetCols = 6;  // Column F (A=1 ... F=6)
+            }
+
+            if (targetCols !== null) {
+              finalRows = finalRows.map(row => {
+                if (row.length > targetCols!) {
+                  return row.slice(0, targetCols!);
+                } else {
+                  const cleaned = [...row];
+                  while (cleaned.length < targetCols!) {
+                    cleaned.push("");
+                  }
+                  return cleaned;
+                }
+              });
+            }
+
+            const sanitizedCsvText = Papa.unparse(finalRows);
+            const headers = finalRows[0].map(h => String(h || "").trim());
+            const rows = finalRows.slice(1);
 
             // Save in MultiuserService
-            const success = MultiuserService.saveSheetOverride(selectedAppId, sheetName, csvText);
+            const success = MultiuserService.saveSheetOverride(selectedAppId, sheetName, sanitizedCsvText);
             if (success) {
               setUploadSuccess(prev => ({
                 ...prev,
@@ -282,7 +313,7 @@ export const AdminPage: React.FC<{
               const currentApp = apps.find(a => a.id === selectedAppId);
               if (currentApp && currentApp.gasWebUrl && !currentApp.gasWebUrl.includes("sample")) {
                 setSyncingState(p => ({ ...p, [sheetName]: 'syncing' }));
-                MultiuserService.pushSheetToRemote(selectedAppId, sheetName, dataRows)
+                MultiuserService.pushSheetToRemote(selectedAppId, sheetName, finalRows)
                   .then(synced => {
                     if (synced) {
                       setSyncingState(p => ({ ...p, [sheetName]: 'success' }));
