@@ -28,7 +28,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'CCTV' | 'OVER_SLA' | 'RATING'>('CCTV');
 
   // Multi-user & custom branding views state
-  const [viewMode, setViewMode] = useState<'DASHBOARD' | 'INSTALLER' | 'ADMIN'>(() => {
+  const [viewMode, setViewMode] = useState<'DASHBOARD' | 'INSTALLER' | 'ADMIN' | 'AKTIVASI'>(() => {
     const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : "");
     const mode = params.get("mode")?.toLowerCase();
     const id = params.get("appId")?.toLowerCase() || "";
@@ -37,6 +37,7 @@ export default function App() {
     }
     return 'DASHBOARD';
   });
+  const [adminRole, setAdminRole] = useState<'ADMIN' | 'SADMIN' | null>(null);
   const [appId, setAppId] = useState<string>("master");
   const [activeApp, setActiveApp] = useState<AppInstance | null>(null);
   const [isAppPending, setIsAppPending] = useState<boolean>(false);
@@ -81,7 +82,7 @@ export default function App() {
           const defaultSpreadsheetId = "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
           
           // Register under MultiuserService
-          app = MultiuserService.registerApplication(cleanName, defaultSpreadsheetId, "");
+          app = await MultiuserService.registerApplication(cleanName, defaultSpreadsheetId, "");
         }
 
         // Fetch refreshed status
@@ -441,7 +442,19 @@ export default function App() {
             {viewMode === 'INSTALLER' ? (
               <InstallerPage />
             ) : viewMode === 'ADMIN' ? (
-              <AdminPage appId={appId} />
+              <AdminPage 
+                appId={appId} 
+                initialTab="UPLOAD" 
+                role={adminRole} 
+                onRoleChange={setAdminRole} 
+              />
+            ) : viewMode === 'AKTIVASI' ? (
+              <AdminPage 
+                appId={appId} 
+                initialTab="AKTIVASI" 
+                role={adminRole} 
+                onRoleChange={setAdminRole} 
+              />
             ) : isAppPending ? (
               /* Blockout pending screen */
               <div className="max-w-2xl mx-auto w-full py-12 px-2 text-center" id="app-pending-blocker">

@@ -1,10 +1,10 @@
 import React from 'react';
-import { LayoutGrid, Zap, BarChart2, ShieldCheck, PlusCircle } from 'lucide-react';
+import { LayoutGrid, Zap, BarChart2, ShieldCheck, PlusCircle, Columns } from 'lucide-react';
 import { MultiuserService } from '../services/multiuserService.ts';
 
 interface HeaderProps {
-  viewMode: 'DASHBOARD' | 'INSTALLER' | 'ADMIN';
-  onViewModeChange: (mode: 'DASHBOARD' | 'INSTALLER' | 'ADMIN') => void;
+  viewMode: 'DASHBOARD' | 'INSTALLER' | 'ADMIN' | 'AKTIVASI';
+  onViewModeChange: (mode: 'DASHBOARD' | 'INSTALLER' | 'ADMIN' | 'AKTIVASI') => void;
   activeTab: 'CCTV' | 'OVER_SLA' | 'RATING';
   onTabChange: (tab: 'CCTV' | 'OVER_SLA' | 'RATING') => void;
   ulName?: string;
@@ -74,12 +74,35 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Global Installer & Admin Tabs */}
           <span className="w-[1px] h-6 bg-white/20 mx-2" />
 
-          <NavItem 
-            icon={<ShieldCheck size={15} />} 
-            label="ADMIN PANEL" 
-            active={viewMode === 'ADMIN'} 
-            onClick={() => onViewModeChange('ADMIN')}
-          />
+          {isMasterApp ? (
+            <>
+              <NavItem 
+                icon={<PlusCircle size={15} />} 
+                label="INSTALL UNIT" 
+                active={viewMode === 'INSTALLER'} 
+                onClick={() => onViewModeChange('INSTALLER')}
+              />
+              <NavItem 
+                icon={<ShieldCheck size={15} />} 
+                label="AKTIVASI" 
+                active={viewMode === 'AKTIVASI'} 
+                onClick={() => onViewModeChange('AKTIVASI')}
+              />
+              <NavItem 
+                icon={<Columns size={15} />} 
+                label="ADMIN PANEL" 
+                active={viewMode === 'ADMIN'} 
+                onClick={() => onViewModeChange('ADMIN')}
+              />
+            </>
+          ) : (
+            <NavItem 
+              icon={<ShieldCheck size={15} />} 
+              label="ADMIN PANEL" 
+              active={viewMode === 'ADMIN'} 
+              onClick={() => onViewModeChange('ADMIN')}
+            />
+          )}
         </nav>
       ) : (
         <div className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase animate-pulse">

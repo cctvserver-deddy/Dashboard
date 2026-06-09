@@ -7,10 +7,19 @@ import {
 } from 'lucide-react';
 import Papa from 'papaparse';
 
-export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) => {
+export const AdminPage: React.FC<{ 
+  appId?: string;
+  initialTab?: 'UPLOAD' | 'AKTIVASI';
+  role: 'ADMIN' | 'SADMIN' | null;
+  onRoleChange: (role: 'ADMIN' | 'SADMIN' | null) => void;
+}> = ({ 
+  appId = "master", 
+  initialTab = "UPLOAD",
+  role,
+  onRoleChange
+}) => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [role, setRole] = useState<'ADMIN' | 'SADMIN' | null>(null);
 
   // App Selection for File Upload
   const [apps, setApps] = useState<AppInstance[]>([]);
@@ -72,10 +81,10 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === "Admind") {
-      setRole('ADMIN'); // File Upload role
+      onRoleChange('ADMIN'); // File Upload role
       setError(null);
     } else if (password === "Sadmin" && appId === "master") {
-      setRole('SADMIN'); // Sadmin / Access Activation role
+      onRoleChange('SADMIN'); // Sadmin / Access Activation role
       setError(null);
     } else if (password === "Sadmin") {
       setError("Kata sandi Super Admin hanya dapat digunakan di Aplikasi Master!");
@@ -85,7 +94,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
   };
 
   const handleLogout = () => {
-    setRole(null);
+    onRoleChange(null);
     setPassword("");
     setUploadSuccess({});
     setSheetPreviews({});
@@ -112,7 +121,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
   };
 
   // Manual Add Unit (Sadmin Feature)
-  const handleManualAddUnit = (e: React.FormEvent) => {
+  const handleManualAddUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddUnitError(null);
     setAddUnitSuccess(null);
@@ -126,7 +135,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
     }
 
     try {
-      const added = MultiuserService.registerApplication(newUnitName, newUnitSheetId, newUnitGasUrl);
+      const added = await MultiuserService.registerApplication(newUnitName, newUnitSheetId, newUnitGasUrl);
       // Automatically activate the manually added unit since SADMIN added it
       MultiuserService.activateApplication(added.id, true);
       
@@ -217,6 +226,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
   ];
 
   if (!role) {
+    const isAktivasiForm = initialTab === 'AKTIVASI';
     return (
       <div className="max-w-md mx-auto w-full py-16" id="login-admin">
         <motion.div 
@@ -232,8 +242,12 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
               <Lock size={28} />
             </div>
             <div>
-              <h2 className="text-lg font-black tracking-widest text-[#00e5ff] uppercase">OTENTIKASI KOORDINATOR</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Masukkan kata sandi untuk melanjutkan</p>
+              <h2 className="text-lg font-black tracking-widest text-[#00e5ff] uppercase">
+                {isAktivasiForm ? "OTENTIKASI SUPER ADMIN" : "OTENTIKASI KOORDINATOR"}
+              </h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                {isAktivasiForm ? "Akses Halaman Aktivasi & Persetujuan Unit" : "Akses Halaman Unggah Berkas CSV Portal"}
+              </p>
             </div>
           </div>
 
@@ -255,7 +269,11 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
                 <ShieldCheck size={14} className="text-cyan-400 shrink-0 mt-0.5" />
                 {appId === "master" ? (
                   <span>
-                    Gunakan sandi <strong>Admind</strong> untuk mengunggah file spreadsheet, atau sandi <strong>Sadmin</strong> untuk Tab AKSES Aktivasi Aplikasi baru secara global.
+                    {isAktivasiForm ? (
+                      <>Gunakan sandi <strong className="text-white">Sadmin</strong> untuk masuk ke Halaman Aktivasi & persetujuan unit baru secara global.</>
+                    ) : (
+                      <>Gunakan sandi <strong className="text-white">Admind</strong> untuk mengunggah file CSV, atau sandi <strong className="text-white">Sadmin</strong> jika Anda adalah Super Admin.</>
+                    )}
                   </span>
                 ) : (
                   <span>
@@ -293,10 +311,10 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
           </div>
           <div>
             <span className="text-[9px] font-black tracking-widest bg-cyan-500/20 text-[#00e5ff] px-2 py-0.5 rounded uppercase">
-              {role === 'SADMIN' ? "SUPER ADMIN (AKSES PANEL)" : "COORDINATOR ADMIN (FILE UPLOAD)"}
+              {initialTab === 'AKTIVASI' ? "SUPER ADMIN (TAB AKTIVASI)" : (role === 'SADMIN' ? "SUPER ADMIN (HAK UNGGAH CSV)" : "COORDINATOR ADMIN (FILE UPLOAD)")}
             </span>
             <h2 className="text-base font-black uppercase text-white mt-1">
-              {role === 'SADMIN' ? "HALAMAN AKTIVASI & AKSES APLIKASI MASTER" : "HALAMAN UNGGAH BERKAS CSV PORTAL"}
+              {initialTab === 'AKTIVASI' ? "HALAMAN AKTIVASI & AKSES APLIKASI MASTER" : "HALAMAN UNGGAH BERKAS CSV PORTAL"}
             </h2>
           </div>
         </div>
@@ -308,7 +326,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
         </button>
       </div>
 
-      {role === 'ADMIN' ? (
+      {initialTab === 'UPLOAD' ? (
         // ------------------------- ADMIN FILE UPLOADER -------------------------
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Instructions and Selection */}
@@ -498,7 +516,7 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
             </div>
           </div>
         </div>
-      ) : role === 'SADMIN' && appId === 'master' ? (
+      ) : (initialTab === 'AKTIVASI' && role === 'SADMIN' && appId === 'master') ? (
         // ------------------------- SUPER ADMIN (SADMIN) TRASH MANAGEMENT & LINKS -------------------------
         <div className="bg-[#0e1738] border border-cyan-500/10 rounded-xl p-5 overflow-x-auto">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
@@ -678,13 +696,57 @@ export const AdminPage: React.FC<{ appId?: string }> = ({ appId = "master" }) =>
           </table>
         </div>
       ) : (
-        <div className="bg-[#0e1738] border border-red-500/20 rounded-xl p-8 text-center space-y-3">
-          <AlertCircle size={32} className="text-red-400 mx-auto" />
-          <h3 className="text-sm font-black text-white uppercase tracking-wider">Akses Terbatas</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Halaman pengaturan aktivasi dan registrasi ini hanya dapat diakses melalui Aplikasi Master. Silakan gunakan password Coordinator Admin untuk fitur penimpaan file lokal unit ini.
-          </p>
-        </div>
+        initialTab === 'AKTIVASI' && appId === 'master' && role !== 'SADMIN' ? (
+          <div className="max-w-md mx-auto w-full py-8">
+            <div className="bg-[#0e1738] border border-yellow-500/20 rounded-2xl p-6 text-center space-y-4 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 rounded-full filter blur-2xl pointer-events-none" />
+              <div className="bg-yellow-500/10 p-3 rounded-full border border-yellow-500/30 text-yellow-400 inline-flex items-center justify-center">
+                <Lock size={24} />
+              </div>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">SANDI SUPER ADMIN DIBUTUHKAN</h3>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
+                Anda masuk sebagai Coordinator Admin. Untuk membuka halaman aktivasi global & mengaktifkan unit baru, silakan masukkan kata sandi Super Admin (<strong className="text-[#00e5ff]">Sadmin</strong>):
+              </p>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const upgradePassword = (e.target as any).upgrade_password.value;
+                if (upgradePassword === "Sadmin") {
+                  onRoleChange('SADMIN');
+                  setError(null);
+                  (e.target as any).upgrade_password.value = "";
+                } else {
+                  setError("Kata sandi Super Admin salah!");
+                }
+              }} className="space-y-3 text-left">
+                <div className="relative">
+                  <input
+                    name="upgrade_password"
+                    type="password"
+                    placeholder="••••••••"
+                    className="w-full bg-[#070b1e] border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-xs text-white text-center font-mono tracking-widest focus:outline-none focus:border-cyan-400"
+                    required
+                  />
+                  <KeyRound size={14} className="absolute left-3 top-3 text-slate-500" />
+                </div>
+                {error && <div className="text-xs text-red-400 font-semibold text-center">⚠ {error}</div>}
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-[#070b1e] font-black py-2.5 rounded-lg text-xs uppercase tracking-widest hover:brightness-110 active:brightness-95 transition-all"
+                >
+                  UPGRADE AKSES AKTIVASI
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-[#0e1738] border border-red-500/20 rounded-xl p-8 text-center space-y-3">
+            <AlertCircle size={32} className="text-red-400 mx-auto" />
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">Akses Terbatas</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Halaman pengaturan aktivasi dan registrasi ini hanya dapat diakses melalui Aplikasi Master. Silakan gunakan password Coordinator Admin untuk fitur penimpaan file lokal unit ini.
+            </p>
+          </div>
+        )
       )}
 
       {/* Preview Modal for Uploaded Sheets */}
