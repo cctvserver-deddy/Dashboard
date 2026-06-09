@@ -123,7 +123,7 @@ export class MultiuserService {
         const ulName = String(row[1] || "").trim();
         const spreadsheetId = String(row[2] || "").trim();
         const gasWebUrl = String(row[3] || "").trim();
-        const status = String(row[4] || "").trim() === "active" ? "active" : "pending";
+        const status = "active"; // Force all applications to be active immediately as requested
         const createdAt = String(row[5] || row[4] || "").trim();
 
         if (id && id !== "master" && id !== "ID") {
@@ -317,13 +317,13 @@ export class MultiuserService {
       ulName: rawName || "UL BARU",
       spreadsheetId: spreadsheetId || "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE", // Use master spreadsheet as template fallback
       gasWebUrl: gasWebUrl.trim(),
-      status: "pending", // ALWAYS pending upon install until Master Admin activates in Tab AKSES
+      status: "active", // Force all applications to be active immediately as requested
       createdAt: new Date().toISOString()
     };
 
     if (existingIndex !== -1) {
-      // Overwrite/Update existing instance to avoid duplicate ID issues while preserving status if already active
-      newApp.status = apps[existingIndex].status === "active" ? "active" : "pending";
+      // Overwrite/Update existing instance to avoid duplicate ID issues while maintaining active status
+      newApp.status = "active";
       apps[existingIndex] = newApp;
     } else {
       apps.push(newApp);
