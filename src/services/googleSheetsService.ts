@@ -367,6 +367,8 @@ export class GoogleSheetsService {
     if (bypassCache) {
       this.processedCacheMap.clear();
       this.rawDataCache = null;
+      this.petugasCache = null;
+      this.ulpCache = null;
     } else {
       const cachedProcessed = this.processedCacheMap.get(cacheKey);
       if (cachedProcessed && (now - cachedProcessed.timestamp < 30000)) {
@@ -504,18 +506,35 @@ export class GoogleSheetsService {
       });
     }
 
+    const defaultUlpsOrder = ["BUKITTINGGI", "PADANG PANJANG", "LUBUK SIKAPING", "LUBUK BASUNG", "SIMPANG EMPAT", "BASO", "KOTO TUO"];
+    
+    // Get unique, non-empty ULP names from the ULP sheet rows loaded in `ulpMap`
+    const rawUlpNamesList = Array.from(ulpMap.values()).map(n => n.trim()).filter(Boolean);
+    const dynamicUlpsOrder = Array.from(new Set(
+      rawUlpNamesList.map(name => {
+        return name.toUpperCase()
+          .replace(/^POSKO ULP\s+/i, "")
+          .replace(/^ULP\s+/i, "")
+          .replace(/^POSKO\s+/i, "")
+          .trim();
+      }).filter(Boolean)
+    ));
+
+    const allUlpsOrder = dynamicUlpsOrder.length > 0 ? dynamicUlpsOrder : defaultUlpsOrder;
+
     const getCanonicalUlpName = (name: string) => {
       if (!name) return "";
       const u = name.toUpperCase().trim();
-      if (u.includes("BUKITTINGGI")) return "BUKITTINGGI";
-      if (u.includes("PADANG PANJANG") || u.includes("PADANGPANJANG")) return "PADANG PANJANG";
-      if (u.includes("LUBUK SIKAPING")) return "LUBUK SIKAPING";
-      if (u.includes("LUBUK BASUNG")) return "LUBUK BASUNG";
-      if (u.includes("SIMPANG EMPAT")) return "SIMPANG EMPAT";
-      if (u.includes("BASO")) return "BASO";
-      if (u.includes("KOTO TUO") || u.includes("KOTOTUO")) return "KOTO TUO";
-      return name;
-    }
+      
+      const normalizedQuery = u.replace(/\s+/g, "").replace(/^POSKOULP/i, "").replace(/^ULP/i, "").replace(/^POSKO/i, "");
+      const matched = allUlpsOrder.find(ulp => {
+        const normalizedTarget = ulp.toUpperCase().replace(/\s+/g, "");
+        return normalizedQuery.includes(normalizedTarget) || normalizedTarget.includes(normalizedQuery);
+      });
+      
+      if (matched) return matched;
+      return name.toUpperCase().trim();
+    };
 
     const officerToUlp = new Map<string, string>();
     const officerToName = new Map<string, string>();
@@ -528,9 +547,6 @@ export class GoogleSheetsService {
       officerToName.set(nKey, o.name);
     });
 
-    // Determine official ULPs list beforehand for REGEX-style matching
-    const allUlpsOrder = ["BUKITTINGGI", "PADANG PANJANG", "LUBUK BASUNG", "LUBUK SIKAPING", "SIMPANG EMPAT", "BASO", "KOTO TUO"];
-    
     // Build from officers sheet
     const officersUlps = officers.map(o => {
       let ulpName = (ulpMap.get(o.ulpId) || o.directUlp || "Unknown");
@@ -560,14 +576,12 @@ export class GoogleSheetsService {
     });
 
     const getExpectedRegu = (ulpName: string) => {
-      const u = ulpName.toUpperCase().trim();
-      if (u.includes("BUKITTINGGI")) return "BUKITTINGGI";
-      if (u.includes("PADANG PANJANG") || u.includes("PADANGPANJANG")) return "PADANGPANJANG";
-      if (u.includes("LUBUK SIKAPING")) return "LUBUK SIKAPING";
-      if (u.includes("LUBUK BASUNG")) return "LUBUK BASUNG";
-      if (u.includes("SIMPANG EMPAT")) return "SIMPANG EMPAT";
-      if (u.includes("BASO")) return "BASO";
-      if (u.includes("KOTO TUO") || u.includes("KOTOTUO")) return "KOTOTUO";
+      const u = ulpName.toUpperCase()
+        .replace(/^POSKO ULP\s+/i, "")
+        .replace(/^ULP\s+/i, "")
+        .replace(/^POSKO\s+/i, "")
+        .replace(/\s+/g, "")
+        .trim();
       return u;
     };
 
@@ -1283,7 +1297,7 @@ export class GoogleSheetsService {
         });
         kpRatings.sort((a, b) => b.totalWoPlnMobile - a.totalWoPlnMobile);
 
-        const specificUlps = ["BUKITTINGGI", "PADANG PANJANG", "LUBUK SIKAPING", "LUBUK BASUNG", "SIMPANG EMPAT", "BASO", "KOTO TUO"];
+        const specificUlps = [...allUlps];
         
         // Dynamically add any other ULP names found in the dataset ratings
         kpRatingStats.forEach((stats) => {
