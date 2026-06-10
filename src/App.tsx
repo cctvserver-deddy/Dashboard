@@ -302,7 +302,7 @@ export default function App() {
   const forceRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const result = await GoogleSheetsService.fetchData(startDate, endDate, selectedUlp, true);
+      const result = await GoogleSheetsService.fetchData(startDate, endDate, selectedUlp, true, activeApp);
       const hasData = result.officerPerformance.length > 0 || result.summary.dataAktif > 0;
       if (!hasData) {
         setError("Tidak ada data yang ditemukan untuk rentang tanggal ini.");
@@ -340,7 +340,7 @@ export default function App() {
       if (needsFullLoader) setIsRefreshing(true);
       
       try {
-        const result = await GoogleSheetsService.fetchData(startDate, endDate, selectedUlp);
+        const result = await GoogleSheetsService.fetchData(startDate, endDate, selectedUlp, false, activeApp);
         const hasData = result.officerPerformance.length > 0 || result.summary.dataAktif > 0;
         if (!hasData) {
           setError("Tidak ada data yang ditemukan untuk rentang tanggal ini.");
