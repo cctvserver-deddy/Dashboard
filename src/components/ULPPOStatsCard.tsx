@@ -6,11 +6,15 @@ import { formatNumber } from '../lib/utils';
 interface ULPPOStatsCardProps {
   ulpData: ULPPerformance[];
   onDetailClick?: (ulp: string, isCctv: boolean) => void;
+  ulName?: string;
 }
 
-export const ULPPOStatsCard: React.FC<ULPPOStatsCardProps> = ({ ulpData, onDetailClick }) => {
-  // Define the specific order requested
-  const requestedOrder = [
+export const ULPPOStatsCard: React.FC<ULPPOStatsCardProps> = ({ ulpData, onDetailClick, ulName }) => {
+  const isSolok = ulName?.toUpperCase().includes("SOLOK");
+  const isBukittinggi = !ulName || ulName.toUpperCase().includes("BUKITTINGGI") || ulName.toUpperCase() === "MASTER";
+
+  // Resolve the appropriate ULP order dynamically
+  let requestedOrder = [
     "BUKITTINGGI",
     "PADANG PANJANG",
     "LUBUK SIKAPING",
@@ -19,6 +23,22 @@ export const ULPPOStatsCard: React.FC<ULPPOStatsCardProps> = ({ ulpData, onDetai
     "BASO",
     "KOTO TUO"
   ];
+
+  if (isSolok) {
+    requestedOrder = [
+      "SOLOK",
+      "SIJUNJUNG",
+      "SAWAHLUNTO",
+      "SILUNGKANG",
+      "MUARALABUH",
+      "SITIUNG",
+      "SINGKARAK",
+      "KAYU ARO",
+      "SUNGAI RUMBAI"
+    ];
+  } else if (!isBukittinggi && ulpData.length > 0) {
+    requestedOrder = Array.from(new Set(ulpData.map(d => d.ulp.toUpperCase())));
+  }
 
   // Map data to the requested order, handling potential missing data and appending any other ULPs dynamically
   const sortedData = [
