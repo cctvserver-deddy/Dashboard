@@ -54,24 +54,24 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("appId") || "master";
-    setAppId(id);
 
     const initApp = async () => {
       // Fetch latest apps list from remote first
       await MultiuserService.fetchRemoteApplications();
 
       if (id.toLowerCase() === "app-install" || id.toLowerCase() === "app-installer") {
+        setAppId(id);
         setIsAppPending(false);
         setActiveApp(null);
         return;
       }
 
-      if (id !== "master") {
+      if (id.toLowerCase() !== "master") {
         let app = MultiuserService.getApplication(id);
         if (!app) {
           // Automatically register unknown appId as a pending application
           let cleanName = id;
-          if (id.startsWith("app-")) {
+          if (id.toLowerCase().startsWith("app-")) {
             cleanName = id.substring(4).replace(/-/g, " ").toUpperCase();
           } else {
             cleanName = id.toUpperCase();
@@ -88,10 +88,14 @@ export default function App() {
         // Fetch refreshed status
         app = MultiuserService.getApplication(id);
         if (app) {
+          setAppId(app.id);
           setIsAppPending(false);
           setActiveApp(app);
+        } else {
+          setAppId(id);
         }
       } else {
+        setAppId("master");
         setIsAppPending(false);
         setActiveApp(null);
       }
@@ -319,10 +323,19 @@ export default function App() {
       return;
     }
 
+    // CRITICAL: If the URL has a custom appId, wait for activeApp to be resolved and verify it matches,
+    // to prevent fetching data prematurely using the fallback/master spreadsheet ID.
+    if (appId.toLowerCase() !== "master" && (!activeApp || activeApp.id.toLowerCase() !== appId.toLowerCase())) {
+      return;
+    }
+
+    // Reset data when appId/activeApp changes, to ensure we show a loading spinner and don't leak old data
+    setData(null);
+
     const loadData = async (showLoading = false) => {
       // If we already have data and are just changing ULP, we don't need a full-page loader
       // the new caching logic in GoogleSheetsService handles this instantly
-      const needsFullLoader = !data || (showLoading && !isRefreshing);
+      const needsFullLoader = showLoading && !isRefreshing;
       
       if (needsFullLoader) setIsRefreshing(true);
       
@@ -343,10 +356,10 @@ export default function App() {
       }
     };
 
-    loadData(!data);
+    loadData(true);
     const interval = setInterval(() => loadData(false), 30000);
     return () => clearInterval(interval);
-  }, [startDate, endDate, selectedUlp, isIsolatedInstaller]);
+  }, [startDate, endDate, selectedUlp, isIsolatedInstaller, appId, activeApp]);
 
   const isLoadingData = !data && viewMode === 'DASHBOARD' && !isAppPending;
 
@@ -406,7 +419,7 @@ export default function App() {
         onTabChange={setActiveTab}
         ulName={ulName}
         isIsolatedInstaller={isIsolatedInstaller}
-        isMasterApp={appId === "master"}
+        isMasterApp={appId.toLowerCase() === "master"}
       />
 
       {viewMode === 'DASHBOARD' && !isAppPending && data && (
