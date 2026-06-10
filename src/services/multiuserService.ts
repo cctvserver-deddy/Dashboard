@@ -37,10 +37,22 @@ export class MultiuserService {
         return defaults;
       }
       const parsed = JSON.parse(stored) as AppInstance[];
-      const forcedActive: AppInstance[] = parsed.map(app => ({
-        ...app,
-        status: "active" as const
-      }));
+      const forcedActive: AppInstance[] = parsed.map(app => {
+        const cleanId = app.id.toLowerCase().trim().replace(/^app-/, "");
+        if (cleanId === "solok") {
+          return {
+            ...app,
+            id: app.id,
+            ulName: "SOLOK",
+            status: "active" as const,
+            spreadsheetId: "1EUc3oQHoF9RCoeRoMwJMg0WHO8BVzK0oU4AmoDvYM94"
+          };
+        }
+        return {
+          ...app,
+          status: "active" as const
+        };
+      });
       // Ensure master is always present
       if (!forcedActive.some(app => app.id === "master")) {
         forcedActive.unshift(this.MASTER_APP);
@@ -130,11 +142,15 @@ export class MultiuserService {
         const createdAt = String(row[5] || row[4] || "").trim();
 
         if (id && id !== "master" && id !== "ID") {
-          if (!apps.some(a => a.id === id)) {
+          const cleanId = id.toLowerCase().trim().replace(/^app-/, "");
+          const targetSpreadsheetId = cleanId === "solok" ? "1EUc3oQHoF9RCoeRoMwJMg0WHO8BVzK0oU4AmoDvYM94" : spreadsheetId;
+          const targetUlName = cleanId === "solok" ? "SOLOK" : ulName;
+
+          if (!apps.some(a => a.id.toLowerCase().trim().replace(/^app-/, "") === cleanId)) {
             apps.push({
               id,
-              ulName,
-              spreadsheetId,
+              ulName: targetUlName,
+              spreadsheetId: targetSpreadsheetId,
               gasWebUrl,
               status,
               createdAt: createdAt || new Date().toISOString()
@@ -147,7 +163,11 @@ export class MultiuserService {
       const localApps = this.getApplications();
       let hasNewLocal = false;
       localApps.forEach(localApp => {
-        const idx = apps.findIndex(remoteApp => remoteApp.id === localApp.id);
+        const idx = apps.findIndex(remoteApp => {
+          const rClean = remoteApp.id.toLowerCase().trim().replace(/^app-/, "");
+          const lClean = localApp.id.toLowerCase().trim().replace(/^app-/, "");
+          return rClean === lClean;
+        });
         if (idx === -1) {
           apps.push(localApp);
           hasNewLocal = true;
@@ -155,13 +175,25 @@ export class MultiuserService {
           // If status or details are different in local storage, we preserve the local state 
           // (which is the source of truth when the Master admin changes activation status)
           const remoteApp = apps[idx];
-          if (remoteApp.status !== localApp.status || remoteApp.spreadsheetId !== localApp.spreadsheetId || remoteApp.gasWebUrl !== localApp.gasWebUrl) {
+          
+          const isRemoteSolokOrCustom = remoteApp.id.toLowerCase().includes("solok") || (remoteApp.spreadsheetId && remoteApp.spreadsheetId !== "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE");
+          const isLocalMasterFallback = localApp.spreadsheetId === "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
+          
+          let targetSpreadsheetId = localApp.spreadsheetId;
+          if (isRemoteSolokOrCustom && isLocalMasterFallback) {
+            targetSpreadsheetId = remoteApp.spreadsheetId;
+          }
+          if (remoteApp.id.toLowerCase().includes("solok")) {
+            targetSpreadsheetId = "1EUc3oQHoF9RCoeRoMwJMg0WHO8BVzK0oU4AmoDvYM94";
+          }
+
+          if (remoteApp.status !== localApp.status || remoteApp.spreadsheetId !== targetSpreadsheetId || remoteApp.gasWebUrl !== localApp.gasWebUrl) {
             apps[idx] = {
               ...remoteApp,
               status: localApp.status,
-              spreadsheetId: localApp.spreadsheetId,
-              gasWebUrl: localApp.gasWebUrl,
-              ulName: localApp.ulName
+              spreadsheetId: targetSpreadsheetId,
+              gasWebUrl: localApp.gasWebUrl || remoteApp.gasWebUrl,
+              ulName: remoteApp.ulName || localApp.ulName
             };
             hasNewLocal = true;
           }
@@ -243,7 +275,24 @@ export class MultiuserService {
   public static getApplication(id: string): AppInstance | null {
     if (!id) return null;
     const apps = this.getApplications();
-    return apps.find(app => app.id.toLowerCase() === id.toLowerCase()) || null;
+    const searchId = id.toLowerCase().trim().replace(/^app-/, "");
+    
+    let matched = apps.find(app => {
+      const appTargetId = app.id.toLowerCase().trim().replace(/^app-/, "");
+      return appTargetId === searchId;
+    }) || null;
+
+    if (!matched && searchId === "solok") {
+      matched = {
+        id: "app-solok",
+        ulName: "SOLOK",
+        spreadsheetId: "1EUc3oQHoF9RCoeRoMwJMg0WHO8BVzK0oU4AmoDvYM94",
+        gasWebUrl: "https://script.google.com/macros/s/AKfycbz1bn6bD8-f7ZravXDUskT0Hucg728h_sh5xgw9p-kQxFWlpN9ZODttYb35hEly26Ka/exec",
+        status: "active",
+        createdAt: new Date().toISOString()
+      };
+    }
+    return matched;
   }
 
   /**
