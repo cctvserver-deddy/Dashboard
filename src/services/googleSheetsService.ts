@@ -182,17 +182,36 @@ export class GoogleSheetsService {
       // Case 1: YYYY MM DD
       if (p1.length === 4 && !isNaN(parseInt(p1))) {
         y = parseInt(p1);
-        if (months[p2] !== undefined) { m = months[p2] + 1; d = parseInt(p3); }
-        else { m = parseInt(p2); d = parseInt(p3); }
+        const isP2Nan = isNaN(Number(p2));
+        if (isP2Nan && months[p2] !== undefined) { 
+          m = months[p2] + 1; 
+          d = parseInt(p3); 
+        } else { 
+          m = parseInt(p2); 
+          d = parseInt(p3); 
+        }
       } 
       // Case 2: DD MM YYYY or MM DD YYYY
       else {
         y = parseInt(p3);
         if (p3.length === 2) y = (y > 70 ? 1900 : 2000) + y;
         
-        if (months[p1] !== undefined) { m = months[p1] + 1; d = parseInt(p2); }
-        else if (months[p2] !== undefined) { m = months[p2] + 1; d = parseInt(p1); }
-        else { d = parseInt(p1); m = parseInt(p2); }
+        const isP1Nan = isNaN(Number(p1));
+        const isP2Nan = isNaN(Number(p2));
+        
+        if (isP1Nan && months[p1] !== undefined) { 
+          m = months[p1] + 1; 
+          d = parseInt(p2); 
+        }
+        else if (isP2Nan && months[p2] !== undefined) { 
+          m = months[p2] + 1; 
+          d = parseInt(p1); 
+        }
+        else { 
+          // Both are numbers, default to DD/MM/YYYY as standard in Indonesia
+          d = parseInt(p1); 
+          m = parseInt(p2); 
+        }
       }
 
       // Hybrid swap if month > 12
