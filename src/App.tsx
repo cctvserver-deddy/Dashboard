@@ -217,6 +217,26 @@ export default function App() {
     setModalOpen(true);
   };
 
+  const handleForceRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await GoogleSheetsService.triggerAppsScriptSync();
+      const result = await GoogleSheetsService.fetchData(startDate, endDate, selectedUlp, true);
+      const hasData = result.officerPerformance.length > 0 || result.summary.dataAktif > 0;
+      if (!hasData) {
+        setError("Tidak ada data yang ditemukan untuk rentang tanggal ini.");
+      } else {
+        setError(null);
+      }
+      setData(result);
+    } catch (err) {
+      console.error("Failed to force refresh data:", err);
+      setError("Gagal melakukan sinkronisasi dengan Google Sheets.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     const loadData = async (showLoading = false) => {
       // If we already have data and are just changing ULP, we don't need a full-page loader
@@ -311,6 +331,8 @@ export default function App() {
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
         activeTab={activeTab}
+        onForceRefresh={handleForceRefresh}
+        isRefreshing={isRefreshing}
       />
       
       <main className="flex-1 p-6 flex flex-col gap-6 overflow-x-hidden">
