@@ -37,12 +37,15 @@ export class MultiuserService {
         return defaults;
       }
       const parsed = JSON.parse(stored) as AppInstance[];
+      const forcedActive: AppInstance[] = parsed.map(app => ({
+        ...app,
+        status: "active" as const
+      }));
       // Ensure master is always present
-      if (!parsed.some(app => app.id === "master")) {
-        parsed.unshift(this.MASTER_APP);
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(parsed));
+      if (!forcedActive.some(app => app.id === "master")) {
+        forcedActive.unshift(this.MASTER_APP);
       }
-      return parsed;
+      return forcedActive;
     } catch (e) {
       console.error("Failed to parse multiuser apps list:", e);
       return [this.MASTER_APP];
