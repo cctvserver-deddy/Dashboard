@@ -241,8 +241,9 @@ export class MultiuserService {
    * Safe retrieval of a single application by ID
    */
   public static getApplication(id: string): AppInstance | null {
+    if (!id) return null;
     const apps = this.getApplications();
-    return apps.find(app => app.id === id) || null;
+    return apps.find(app => app.id.toLowerCase() === id.toLowerCase()) || null;
   }
 
   /**
