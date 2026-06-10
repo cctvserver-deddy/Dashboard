@@ -33,11 +33,11 @@ export class GoogleSheetsService {
     endDate?: string
   } | null = null;
 
-  private static async fetchSheetDataRaw(sheetName: string): Promise<any[][]> {
+  private static async fetchSheetDataRaw(sheetName: string, activeApp?: any | null): Promise<any[][]> {
     const params = new URLSearchParams(window.location.search);
     let appId = params.get("appId") || "master";
 
-    const app = MultiuserService.getApplication(appId);
+    const app = activeApp !== undefined ? activeApp : MultiuserService.getApplication(appId);
     if (app) {
       appId = app.id;
     }
@@ -50,7 +50,7 @@ export class GoogleSheetsService {
 
     // 2. Resolve Spreadsheet ID dynamically
     let sId = this.SPREADSHEET_ID;
-    if (app && app.status === "active") {
+    if (app) {
       sId = app.spreadsheetId;
     }
 
@@ -330,11 +330,11 @@ export class GoogleSheetsService {
     return nRegu === expectedRegu;
   }
 
-  static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string, bypassCache = false): Promise<DashboardData> {
+  static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string, bypassCache = false, activeApp?: any | null): Promise<DashboardData> {
     const params = new URLSearchParams(window.location.search);
     let appId = params.get("appId") || "master";
 
-    const app = MultiuserService.getApplication(appId);
+    const app = activeApp !== undefined ? activeApp : MultiuserService.getApplication(appId);
     if (app) {
       appId = app.id;
     }
@@ -405,12 +405,12 @@ export class GoogleSheetsService {
       ratingRows = cached.ratingRows;
     } else {
       [woRows, poRows, petugasRows, ulpRows, poskoRows, ratingRows] = await Promise.all([
-        this.fetchSheetDataRaw("WO"),
-        this.fetchSheetDataRaw("PO"),
-        this.petugasCache ? Promise.resolve(this.petugasCache) : this.fetchSheetDataRaw("PETUGAS").then(data => { this.petugasCache = data; return data; }),
-        this.ulpCache ? Promise.resolve(this.ulpCache) : this.fetchSheetDataRaw("ULP").then(data => { this.ulpCache = data; return data; }),
-        this.fetchSheetDataRaw("POSKO"),
-        this.fetchSheetDataRaw("RATING"),
+        this.fetchSheetDataRaw("WO", app),
+        this.fetchSheetDataRaw("PO", app),
+        this.petugasCache ? Promise.resolve(this.petugasCache) : this.fetchSheetDataRaw("PETUGAS", app).then(data => { this.petugasCache = data; return data; }),
+        this.ulpCache ? Promise.resolve(this.ulpCache) : this.fetchSheetDataRaw("ULP", app).then(data => { this.ulpCache = data; return data; }),
+        this.fetchSheetDataRaw("POSKO", app),
+        this.fetchSheetDataRaw("RATING", app),
       ]);
 
       if (woRows.length > 0 || poRows.length > 0) {
