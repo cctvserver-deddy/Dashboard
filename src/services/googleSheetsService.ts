@@ -35,7 +35,12 @@ export class GoogleSheetsService {
 
   private static async fetchSheetDataRaw(sheetName: string): Promise<any[][]> {
     const params = new URLSearchParams(window.location.search);
-    const appId = params.get("appId") || "master";
+    let appId = params.get("appId") || "master";
+
+    const app = MultiuserService.getApplication(appId);
+    if (app) {
+      appId = app.id;
+    }
 
     // 1. Check local storage override first for this specific app
     const localOverride = MultiuserService.getSheetOverride(appId, sheetName);
@@ -45,7 +50,6 @@ export class GoogleSheetsService {
 
     // 2. Resolve Spreadsheet ID dynamically
     let sId = this.SPREADSHEET_ID;
-    const app = MultiuserService.getApplication(appId);
     if (app && app.status === "active") {
       sId = app.spreadsheetId;
     }
@@ -328,12 +332,17 @@ export class GoogleSheetsService {
 
   static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string, bypassCache = false): Promise<DashboardData> {
     const params = new URLSearchParams(window.location.search);
-    const appId = params.get("appId") || "master";
+    let appId = params.get("appId") || "master";
+
+    const app = MultiuserService.getApplication(appId);
+    if (app) {
+      appId = app.id;
+    }
 
     const ALLOWED_REGUS = ["BUKITTINGGI", "PADANGPANJANG", "LUBUKBASUNG", "LUBUKSIKAPING", "SIMPANGEMPAT", "BASO", "KOTOTUO"];
     const isUp3Regu = (r: string) => {
       if (!r) return false;
-      if (appId !== "master") {
+      if (appId.toLowerCase() !== "master") {
         return true; // Allow any regu/ULP for newly custom-installed sub-apps as requested
       }
       const normalized = r.toUpperCase().replace(/\s+/g, "").trim();
