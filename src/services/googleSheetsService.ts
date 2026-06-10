@@ -304,7 +304,25 @@ export class GoogleSheetsService {
     return nRegu === expectedRegu;
   }
 
-  static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string): Promise<DashboardData> {
+  static async triggerAppsScriptSync(): Promise<boolean> {
+    try {
+      const url = (import.meta as any).env.VITE_APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwO9RXhZRBv-bF5RiR7Rst4jul8xTjdkWbjzEeI_zaWKwOgRNBguNtE2a5p45EbwRN8VQ/exec";
+      await fetch(url, { method: "GET", mode: "no-cors", cache: "no-store" });
+      return true;
+    } catch (error) {
+      console.error("Error triggering Apps Script Sync:", error);
+      return false;
+    }
+  }
+
+  static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string, bypassCache = false): Promise<DashboardData> {
+    if (bypassCache) {
+      this.rawDataCache = null;
+      this.petugasCache = null;
+      this.ulpCache = null;
+      this.dateFilteredCache = null;
+    }
+
     const ALLOWED_REGUS = ["SOLOK", "SIJUNJUNG", "SAWAHLUNTO", "SILUNGKANG", "MUARALABUH", "SITIUNG", "SINGKARAK", "KAYUARO", "SUNGAIRUMBAI"];
     const isUp3Regu = (r: string) => {
       if (!r) return false;
