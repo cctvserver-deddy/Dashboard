@@ -327,9 +327,15 @@ export class GoogleSheetsService {
   }
 
   static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string, bypassCache = false): Promise<DashboardData> {
+    const params = new URLSearchParams(window.location.search);
+    const appId = params.get("appId") || "master";
+
     const ALLOWED_REGUS = ["BUKITTINGGI", "PADANGPANJANG", "LUBUKBASUNG", "LUBUKSIKAPING", "SIMPANGEMPAT", "BASO", "KOTOTUO"];
     const isUp3Regu = (r: string) => {
       if (!r) return false;
+      if (appId !== "master") {
+        return true; // Allow any regu/ULP for newly custom-installed sub-apps as requested
+      }
       const normalized = r.toUpperCase().replace(/\s+/g, "").trim();
       return ALLOWED_REGUS.includes(normalized);
     };
@@ -344,9 +350,6 @@ export class GoogleSheetsService {
     };
 
     const allRegusInUlp = new Map<string, string>(); // Regu -> ULP
-
-    const params = new URLSearchParams(window.location.search);
-    const appId = params.get("appId") || "master";
 
     // Clear caches if the active sub-app changed
     if (this.lastAppId !== appId) {
@@ -1281,6 +1284,15 @@ export class GoogleSheetsService {
         kpRatings.sort((a, b) => b.totalWoPlnMobile - a.totalWoPlnMobile);
 
         const specificUlps = ["BUKITTINGGI", "PADANG PANJANG", "LUBUK SIKAPING", "LUBUK BASUNG", "SIMPANG EMPAT", "BASO", "KOTO TUO"];
+        
+        // Dynamically add any other ULP names found in the dataset ratings
+        kpRatingStats.forEach((stats) => {
+          const sUlpName = getCanonicalUlpName(standardizeUlpName(stats.ulp));
+          if (sUlpName && !specificUlps.includes(sUlpName)) {
+            specificUlps.push(sUlpName);
+          }
+        });
+
         const ulpRatingMap = new Map<string, { 
           totalWo: number; r5: number; r34: number; r12: number; noR: number;
         }>();
@@ -1296,6 +1308,9 @@ export class GoogleSheetsService {
           // Find the matching specific ULP (some might be slightly different in spelling, but standardizeUlpName should handle most)
           const matchedUlp = specificUlps.find(su => standardizeUlpName(su) === sUlp);
           if (matchedUlp) {
+            if (!ulpRatingMap.has(matchedUlp)) {
+              ulpRatingMap.set(matchedUlp, { totalWo: 0, r5: 0, r34: 0, r12: 0, noR: 0 });
+            }
             const current = ulpRatingMap.get(matchedUlp)!;
             current.totalWo += stats.totalWo;
             current.r5 += stats.r5;
