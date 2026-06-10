@@ -1,8 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, FileText, Download } from 'lucide-react';
-
-import { MultiuserService } from '../services/multiuserService.ts';
+import * as XLSX from 'xlsx';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -10,27 +9,23 @@ interface DetailModalProps {
   title: string;
   headers: string[];
   rows: any[][];
-  ulName?: string;
 }
 
-export function DetailModal({ isOpen, onClose, title, headers, rows, ulName }: DetailModalProps) {
+export function DetailModal({ isOpen, onClose, title, headers, rows }: DetailModalProps) {
   if (!isOpen) return null;
 
-  const handleExportCSV = () => {
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
+  const handleExportExcel = () => {
+    // Generate formatted rows based on display values in UI
+    const formattedRows = rows.map(row => 
+      row.map((cell, j) => formatCellValue(cell, headers[j]))
+    );
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${title.replace(/\s+/g, '_')}_${new Date().getTime()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...formattedRows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data Detail");
+
+    // Save file as .xlsx
+    XLSX.writeFile(wb, `${title.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`);
   };
 
   const isDateColumn = (header: string) => {
@@ -169,11 +164,11 @@ export function DetailModal({ isOpen, onClose, title, headers, rows, ulName }: D
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={handleExportCSV}
+                onClick={handleExportExcel}
                 className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-[10px] font-black tracking-widest uppercase transition-all"
               >
                 <Download size={14} />
-                EXPORT CSV
+                EXPORT EXCELL
               </button>
               <button
                 onClick={onClose}
@@ -226,7 +221,7 @@ export function DetailModal({ isOpen, onClose, title, headers, rows, ulName }: D
               TOTAL: {rows.length} BARIS DATA
             </p>
             <p className="text-[10px] font-black text-gray-300 tracking-[0.3em] uppercase">
-              {MultiuserService.replaceBrandingText("PLN ELECTRICITY SERVICES • UL BUKITTINGGI", ulName || "BUKITTINGGI")}
+              PLN ELECTRICITY SERVICES • UL SOLOK
             </p>
           </div>
         </motion.div>

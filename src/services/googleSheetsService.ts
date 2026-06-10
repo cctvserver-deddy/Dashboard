@@ -1,14 +1,12 @@
 import { DashboardData, OfficerPerformance, CCTVUsage, OfficerRating, KPRating, ULPRating } from "../types.ts";
 import Papa from "papaparse";
-import { MultiuserService } from "./multiuserService.ts";
 
 export class GoogleSheetsService {
-  private static SPREADSHEET_ID = "1CXQHbSse7jic16s5hZwzSQl8MbDSAy9nBUKr5Z8ACVE";
+  private static SPREADSHEET_ID = "1EUc3oQHoF9RCoeRoMwJMg0WHO8BVzK0oU4AmoDvYM94";
   private static petugasCache: any[][] | null = null;
   private static ulpCache: any[][] | null = null;
-  private static lastAppId: string | null = null;
   
-  // Cache for raw data independent of date filters to support lightning-fast sub-second filter processing
+  // Cache for raw data to make filtering smoother
   private static rawDataCache: {
     data: {
       woRows: any[][],
@@ -18,12 +16,10 @@ export class GoogleSheetsService {
       poskoRows: any[][],
       ratingRows: any[][]
     },
-    appId: string,
+    startDate?: string,
+    endDate?: string,
     timestamp: number
   } | null = null;
-
-  // Cache for processed DashboardData results per filter combination to make page pagination/switching instant
-  private static processedCacheMap = new Map<string, { data: DashboardData; timestamp: number }>();
 
   // Cache for date-filtered rows to speed up ULP filtering
   private static dateFilteredCache: {
@@ -33,31 +29,11 @@ export class GoogleSheetsService {
     endDate?: string
   } | null = null;
 
-  private static async fetchSheetDataRaw(sheetName: string, activeApp?: any | null): Promise<any[][]> {
-    const params = new URLSearchParams(window.location.search);
-    let appId = params.get("appId") || "master";
-
-    const app = activeApp !== undefined ? activeApp : MultiuserService.getApplication(appId);
-    if (app) {
-      appId = app.id;
-    }
-
-    // 1. Check local storage override first for this specific app
-    const localOverride = MultiuserService.getSheetOverride(appId, sheetName);
-    if (localOverride && localOverride.length > 0) {
-      return localOverride;
-    }
-
-    // 2. Resolve Spreadsheet ID dynamically
-    let sId = this.SPREADSHEET_ID;
-    if (app) {
-      sId = app.spreadsheetId;
-    }
-
+  private static async fetchSheetDataRaw(sheetName: string): Promise<any[][]> {
     const endpoints = [
-      `https://docs.google.com/spreadsheets/d/${sId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
-      `https://docs.google.com/spreadsheets/d/${sId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`,
-      `https://docs.google.com/spreadsheets/d/${sId}/pub?output=csv&sheet=${encodeURIComponent(sheetName)}`
+      `https://docs.google.com/spreadsheets/d/${this.SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
+      `https://docs.google.com/spreadsheets/d/${this.SPREADSHEET_ID}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`,
+      `https://docs.google.com/spreadsheets/d/${this.SPREADSHEET_ID}/pub?output=csv&sheet=${encodeURIComponent(sheetName)}`
     ];
 
     for (const url of endpoints) {
@@ -182,36 +158,17 @@ export class GoogleSheetsService {
       // Case 1: YYYY MM DD
       if (p1.length === 4 && !isNaN(parseInt(p1))) {
         y = parseInt(p1);
-        const isP2Nan = isNaN(Number(p2));
-        if (isP2Nan && months[p2] !== undefined) { 
-          m = months[p2] + 1; 
-          d = parseInt(p3); 
-        } else { 
-          m = parseInt(p2); 
-          d = parseInt(p3); 
-        }
+        if (months[p2] !== undefined) { m = months[p2] + 1; d = parseInt(p3); }
+        else { m = parseInt(p2); d = parseInt(p3); }
       } 
       // Case 2: DD MM YYYY or MM DD YYYY
       else {
         y = parseInt(p3);
         if (p3.length === 2) y = (y > 70 ? 1900 : 2000) + y;
         
-        const isP1Nan = isNaN(Number(p1));
-        const isP2Nan = isNaN(Number(p2));
-        
-        if (isP1Nan && months[p1] !== undefined) { 
-          m = months[p1] + 1; 
-          d = parseInt(p2); 
-        }
-        else if (isP2Nan && months[p2] !== undefined) { 
-          m = months[p2] + 1; 
-          d = parseInt(p1); 
-        }
-        else { 
-          // Both are numbers, default to DD/MM/YYYY as standard in Indonesia
-          d = parseInt(p1); 
-          m = parseInt(p2); 
-        }
+        if (months[p1] !== undefined) { m = months[p1] + 1; d = parseInt(p2); }
+        else if (months[p2] !== undefined) { m = months[p2] + 1; d = parseInt(p1); }
+        else { d = parseInt(p1); m = parseInt(p2); }
       }
 
       // Hybrid swap if month > 12
@@ -266,15 +223,9 @@ export class GoogleSheetsService {
         if (idx !== -1) return idx;
         
         if (t === "nama petugas" || t === "name") {
-          idx = row.findIndex(h => (h.includes("nama") && h.includes("petugas")) || h === "petugas" || h === "name" || h === "nama" || h.includes("personil") || h.includes("yantek"));
-        } else if (t === "shift") {
-          idx = row.findIndex(h => h === "shift" || h === "shif" || h.includes("shift") || h.includes("shif"));
+          idx = row.findIndex(h => (h.includes("nama") && h.includes("petugas")) || h === "petugas" || h === "name" || h === "nama");
         } else if (t === "cctv") {
           idx = row.findIndex(h => h === "cctv" || h.includes("cctv"));
-        } else if (t === "ulpid" || t === "ulp_id" || t === "ulp id") {
-          idx = row.findIndex(h => h === "ulpid" || h === "ulp_id" || h === "ulp id" || (h.includes("ulp") && h.includes("id")));
-        } else if (t === "poskoid" || t === "poskold" || t === "posko_id" || t === "posko id") {
-          idx = row.findIndex(h => h === "poskoid" || h === "poskold" || h === "posko_id" || h === "posko id" || (h.includes("posko") && (h.includes("id") || h.includes("ld"))));
         } else if (t === "ulp") {
           idx = row.findIndex(h => h === "ulp" || h.includes("ulp") || h === "unit" || h === "posko" || h.includes("posko"));
         } else if (t === "tgl lapor") {
@@ -288,6 +239,8 @@ export class GoogleSheetsService {
           idx = row.findIndex(h => h === "tanggal" || h.includes("tanggal") || h.includes("date") || h.includes("tgl"));
         } else if (t === "no laporan" || t === "no tugas") {
           idx = row.findIndex(h => (h.includes("no") && (h.includes("lap") || h.includes("tug"))) || h === "id" || h.includes("laporan id") || h.includes("id laporan") || h.includes("task id") || h.includes("id tugas"));
+        } else if (t === "ulp" || t === "ulp id" || t === "ulpid") {
+          idx = row.findIndex(h => h === "ulp" || h === "ulpid" || h === "ulp_id" || h === "ulp id" || h.includes("ulp") || h === "unit" || h === "posko" || h.includes("posko"));
         } else if (t === "apkt status" || t === "status apkt") {
           idx = row.findIndex(h => h.toLowerCase().includes("status") && h.toLowerCase().includes("apkt"));
         } else if (t === "nama regu") {
@@ -334,13 +287,15 @@ export class GoogleSheetsService {
 
   private static isValidRegu(ulpName: string, reguValue: string): boolean {
     const ulpToReguMap: Record<string, string> = {
-      "BUKITTINGGI": "BUKITTINGGI",
-      "PADANGPANJANG": "PADANGPANJANG",
-      "LUBUKSIKAPING": "LUBUKSIKAPING",
-      "LUBUKBASUNG": "LUBUKBASUNG",
-      "SIMPANGEMPAT": "SIMPANGEMPAT",
-      "BASO": "BASO",
-      "KOTOTUO": "KOTOTUO"
+      "SOLOK": "SOLOK",
+      "SIJUNJUNG": "SIJUNJUNG",
+      "SAWAHLUNTO": "SAWAHLUNTO",
+      "SILUNGKANG": "SILUNGKANG",
+      "MUARALABUH": "MUARALABUH",
+      "SITIUNG": "SITIUNG",
+      "SINGKARAK": "SINGKARAK",
+      "KAYUARO": "KAYUARO",
+      "SUNGAIRUMBAI": "SUNGAIRUMBAI"
     };
     const nUlp = this.normalizeForMatch(ulpName);
     const nRegu = this.normalizeForMatch(reguValue);
@@ -349,21 +304,10 @@ export class GoogleSheetsService {
     return nRegu === expectedRegu;
   }
 
-  static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string, bypassCache = false, activeApp?: any | null): Promise<DashboardData> {
-    const params = new URLSearchParams(window.location.search);
-    let appId = params.get("appId") || "master";
-
-    const app = activeApp !== undefined ? activeApp : MultiuserService.getApplication(appId);
-    if (app) {
-      appId = app.id;
-    }
-
-    const ALLOWED_REGUS = ["BUKITTINGGI", "PADANGPANJANG", "LUBUKBASUNG", "LUBUKSIKAPING", "SIMPANGEMPAT", "BASO", "KOTOTUO"];
+  static async fetchData(startDate?: string, endDate?: string, selectedUlp?: string): Promise<DashboardData> {
+    const ALLOWED_REGUS = ["SOLOK", "SIJUNJUNG", "SAWAHLUNTO", "SILUNGKANG", "MUARALABUH", "SITIUNG", "SINGKARAK", "KAYUARO", "SUNGAIRUMBAI"];
     const isUp3Regu = (r: string) => {
       if (!r) return false;
-      if (appId.toLowerCase() !== "master") {
-        return true; // Allow any regu/ULP for newly custom-installed sub-apps as requested
-      }
       const normalized = r.toUpperCase().replace(/\s+/g, "").trim();
       return ALLOWED_REGUS.includes(normalized);
     };
@@ -379,40 +323,15 @@ export class GoogleSheetsService {
 
     const allRegusInUlp = new Map<string, string>(); // Regu -> ULP
 
-    // Clear caches if the active sub-app changed
-    if (this.lastAppId !== appId) {
-      this.petugasCache = null;
-      this.ulpCache = null;
-      this.rawDataCache = null;
-      this.dateFilteredCache = null;
-      this.processedCacheMap.clear();
-      this.lastAppId = appId;
-    }
-
     const now = Date.now();
-    const cacheKey = `${appId}_${startDate || ''}_${endDate || ''}_${selectedUlp || ''}`;
-
-    if (bypassCache) {
-      this.processedCacheMap.clear();
-      this.rawDataCache = null;
-      this.petugasCache = null;
-      this.ulpCache = null;
-    } else {
-      const cachedProcessed = this.processedCacheMap.get(cacheKey);
-      if (cachedProcessed && (now - cachedProcessed.timestamp < 30000)) {
-        // Return cached processed data instantly!
-        return cachedProcessed.data;
-      }
-    }
-
     let woRows: any[][], poRows: any[][], petugasRows: any[][], ulpRows: any[][], poskoRows: any[][], ratingRows: any[][];
     const woOverSlaRptList: any[][] = [];
 
     // 1. DATA ACQUISITION (Cached or Fresh)
-    const canUseRawCache = !bypassCache && 
-                           this.rawDataCache && 
-                           this.rawDataCache.appId === appId &&
-                           (now - this.rawDataCache.timestamp < 300000); // 5 minutes cache for raw sheets
+    const canUseRawCache = this.rawDataCache && 
+                           this.rawDataCache.startDate === startDate && 
+                           this.rawDataCache.endDate === endDate && 
+                           (now - this.rawDataCache.timestamp < 30000);
 
     if (canUseRawCache) {
       const cached = this.rawDataCache!.data;
@@ -424,19 +343,20 @@ export class GoogleSheetsService {
       ratingRows = cached.ratingRows;
     } else {
       [woRows, poRows, petugasRows, ulpRows, poskoRows, ratingRows] = await Promise.all([
-        this.fetchSheetDataRaw("WO", app),
-        this.fetchSheetDataRaw("PO", app),
-        this.petugasCache ? Promise.resolve(this.petugasCache) : this.fetchSheetDataRaw("PETUGAS", app).then(data => { this.petugasCache = data; return data; }),
-        this.ulpCache ? Promise.resolve(this.ulpCache) : this.fetchSheetDataRaw("ULP", app).then(data => { this.ulpCache = data; return data; }),
-        this.fetchSheetDataRaw("POSKO", app),
-        this.fetchSheetDataRaw("RATING", app),
+        this.fetchSheetDataRaw("WO"),
+        this.fetchSheetDataRaw("PO"),
+        this.petugasCache ? Promise.resolve(this.petugasCache) : this.fetchSheetDataRaw("PETUGAS").then(data => { this.petugasCache = data; return data; }),
+        this.ulpCache ? Promise.resolve(this.ulpCache) : this.fetchSheetDataRaw("ULP").then(data => { this.ulpCache = data; return data; }),
+        this.fetchSheetDataRaw("POSKO"),
+        this.fetchSheetDataRaw("RATING"),
       ]);
 
       if (woRows.length > 0 || poRows.length > 0) {
         this.rawDataCache = {
           data: { woRows, poRows, petugasRows, ulpRows, poskoRows, ratingRows },
-          timestamp: now,
-          appId
+          startDate,
+          endDate,
+          timestamp: now
         };
         // Reset date cache because raw data changed
         this.dateFilteredCache = null;
@@ -446,80 +366,24 @@ export class GoogleSheetsService {
 
     // 1. Get ULP, POSKO and Petugas data for mapping
     const ulpMap = new Map<string, string>();
-    const poskoIdToUlpIdMapFromUlpSheet = new Map<string, string>(); // poskoId -> ulpId
-
-    const { headerRowIdx: ulpHeaderIdx, colIndices: ulpCols } = this.findHeaderAndCols(ulpRows, ["id", "name", "poskoid"]);
+    const { headerRowIdx: ulpHeaderIdx, colIndices: ulpCols } = this.findHeaderAndCols(ulpRows, ["id", "name"]);
     if (ulpCols[0] !== -1 && ulpCols[1] !== -1) {
       ulpRows.slice(ulpHeaderIdx + 1).forEach(row => {
         const id = String(row[ulpCols[0]] || "").trim();
         const name = String(row[ulpCols[1]] || "").trim();
         if (id && name) ulpMap.set(id, name);
-        
-        if (ulpCols[2] !== -1 && ulpCols[2] < row.length) {
-          const poskoId = String(row[ulpCols[2]] || "").trim();
-          if (poskoId && id) {
-            poskoIdToUlpIdMapFromUlpSheet.set(poskoId, id);
-          }
-        }
       });
     }
 
     const poskoToUlpIdMap = new Map<string, string>();
-    const poskoIdToNameMap = new Map<string, string>();
-    const poskoNameToIdMap = new Map<string, string>();
-
     const { headerRowIdx: poskoHeaderIdx, colIndices: poskoCols } = this.findHeaderAndCols(poskoRows, ["posko", "poskoid", "ulp_id"]);
-    
-    let isNewFormat = false;
-    if (poskoCols[0] === -1) {
-      // Try parsing with new "id" and "name" layout (e.g. uploaded via CSV template)
-      const { headerRowIdx: newHeaderIdx, colIndices: newCols } = this.findHeaderAndCols(poskoRows, ["name", "id"]);
-      if (newCols[0] !== -1 && newCols[1] !== -1) {
-        isNewFormat = true;
-        const nameIdx = newCols[0];
-        const idIdx = newCols[1];
-        
-        poskoRows.slice(newHeaderIdx + 1).forEach(row => {
-          const poskoNameRaw = String(row[nameIdx] || "").trim();
-          const poskoName = this.normalizeForMatch(poskoNameRaw);
-          const rawId = String(row[idIdx] || "").trim();
-          
-          if (poskoName && rawId) {
-            poskoIdToNameMap.set(rawId, poskoNameRaw);
-            poskoNameToIdMap.set(poskoName, rawId);
-          }
-
-          // Backwards compatibility fallback of digits from ID
-          const digitMatch = rawId.match(/\d+/);
-          const ulpId = digitMatch ? digitMatch[0] : rawId;
-          
-          if (poskoName && ulpId) {
-            poskoToUlpIdMap.set(poskoName, ulpId);
-          }
-          if (poskoName && rawId && rawId !== ulpId) {
-            poskoToUlpIdMap.set(poskoName, rawId);
-          }
-         });
-      }
-    }
-
-    if (!isNewFormat && poskoCols[0] !== -1) {
+    if (poskoCols[0] !== -1) {
       poskoRows.slice(poskoHeaderIdx + 1).forEach(row => {
-        const poskoNameRaw = String(row[poskoCols[0]] || "").trim();
-        const poskoName = this.normalizeForMatch(poskoNameRaw);
+        const poskoName = this.normalizeForMatch(String(row[poskoCols[0]] || ""));
         const ulpId = String(row[poskoCols[1]] !== undefined ? row[poskoCols[1]] : (row[poskoCols[2]] || "")).trim();
         if (poskoName && ulpId) poskoToUlpIdMap.set(poskoName, ulpId);
       });
     }
-
-    // Connect POSKO to ULP using ULP sheet's relation (poskoId -> ulpId)
-    poskoIdToNameMap.forEach((name, poskoId) => {
-      const ulpId = poskoIdToUlpIdMapFromUlpSheet.get(poskoId);
-      if (ulpId) {
-        const normName = this.normalizeForMatch(name);
-        poskoToUlpIdMap.set(normName, ulpId);
-      }
-    });
 
     const { headerRowIdx: petugasHeaderIdx, colIndices: petugasCols } = this.findHeaderAndCols(petugasRows, ["name", "ulpId", "ulp"]);
     const officers: { name: string; ulpId: string; directUlp: string }[] = [];
@@ -534,35 +398,20 @@ export class GoogleSheetsService {
       });
     }
 
-    const defaultUlpsOrder = ["BUKITTINGGI", "PADANG PANJANG", "LUBUK SIKAPING", "LUBUK BASUNG", "SIMPANG EMPAT", "BASO", "KOTO TUO"];
-    
-    // Get unique, non-empty ULP names from the ULP sheet rows loaded in `ulpMap`
-    const rawUlpNamesList = Array.from(ulpMap.values()).map(n => n.trim()).filter(Boolean);
-    const dynamicUlpsOrder = Array.from(new Set(
-      rawUlpNamesList.map(name => {
-        return name.toUpperCase()
-          .replace(/^POSKO ULP\s+/i, "")
-          .replace(/^ULP\s+/i, "")
-          .replace(/^POSKO\s+/i, "")
-          .trim();
-      }).filter(Boolean)
-    ));
-
-    const allUlpsOrder = dynamicUlpsOrder.length > 0 ? dynamicUlpsOrder : defaultUlpsOrder;
-
     const getCanonicalUlpName = (name: string) => {
       if (!name) return "";
       const u = name.toUpperCase().trim();
-      
-      const normalizedQuery = u.replace(/\s+/g, "").replace(/^POSKOULP/i, "").replace(/^ULP/i, "").replace(/^POSKO/i, "");
-      const matched = allUlpsOrder.find(ulp => {
-        const normalizedTarget = ulp.toUpperCase().replace(/\s+/g, "");
-        return normalizedQuery.includes(normalizedTarget) || normalizedTarget.includes(normalizedQuery);
-      });
-      
-      if (matched) return matched;
-      return name.toUpperCase().trim();
-    };
+      if (u.includes("SOLOK")) return "SOLOK";
+      if (u.includes("SIJUNJUNG")) return "SIJUNJUNG";
+      if (u.includes("SAWAHLUNTO")) return "SAWAHLUNTO";
+      if (u.includes("SILUNGKANG")) return "SILUNGKANG";
+      if (u.includes("MUARALABUH") || u.includes("MUARA LABUH")) return "MUARALABUH";
+      if (u.includes("SITIUNG")) return "SITIUNG";
+      if (u.includes("SINGKARAK")) return "SINGKARAK";
+      if (u.includes("KAYU ARO") || u.includes("KAYUARO")) return "KAYU ARO";
+      if (u.includes("SUNGAI RUMBAI") || u.includes("SUNGAIRUMBAI")) return "SUNGAI RUMBAI";
+      return name;
+    }
 
     const officerToUlp = new Map<string, string>();
     const officerToName = new Map<string, string>();
@@ -575,25 +424,13 @@ export class GoogleSheetsService {
       officerToName.set(nKey, o.name);
     });
 
-    // Build from officers sheet
-    const officersUlps = officers.map(o => {
+    // Determine official ULPs list beforehand for REGEX-style matching
+    const allUlpsOrder = ["SOLOK", "SIJUNJUNG", "SAWAHLUNTO", "SILUNGKANG", "MUARALABUH", "SITIUNG", "SINGKARAK", "KAYU ARO", "SUNGAI RUMBAI"];
+    const allUlps = Array.from(new Set(officers.map(o => {
       let ulpName = (ulpMap.get(o.ulpId) || o.directUlp || "Unknown");
       let standardized = standardizeUlpName(ulpName);
       return getCanonicalUlpName(standardized);
-    });
-
-    // Build from ULP sheet
-    const ulpSheetUlps = Array.from(ulpMap.values()).map(name => {
-      let standardized = standardizeUlpName(name);
-      return getCanonicalUlpName(standardized);
-    });
-
-    // Merge all with the pre-defined ones to ensure completeness
-    const allUlps = Array.from(new Set([
-      ...allUlpsOrder,
-      ...officersUlps,
-      ...ulpSheetUlps
-    ])).filter(u => u !== "UNKNOWN" && u && isUp3Regu(u))
+    }))).filter(u => u !== "UNKNOWN" && isUp3Regu(u))
     .sort((a, b) => {
       const idxA = allUlpsOrder.indexOf(a);
       const idxB = allUlpsOrder.indexOf(b);
@@ -604,12 +441,16 @@ export class GoogleSheetsService {
     });
 
     const getExpectedRegu = (ulpName: string) => {
-      const u = ulpName.toUpperCase()
-        .replace(/^POSKO ULP\s+/i, "")
-        .replace(/^ULP\s+/i, "")
-        .replace(/^POSKO\s+/i, "")
-        .replace(/\s+/g, "")
-        .trim();
+      const u = ulpName.toUpperCase().trim();
+      if (u.includes("SOLOK")) return "SOLOK";
+      if (u.includes("SIJUNJUNG")) return "SIJUNJUNG";
+      if (u.includes("SAWAHLUNTO")) return "SAWAHLUNTO";
+      if (u.includes("SILUNGKANG")) return "SILUNGKANG";
+      if (u.includes("MUARALABUH") || u.includes("MUARA LABUH")) return "MUARALABUH";
+      if (u.includes("SITIUNG")) return "SITIUNG";
+      if (u.includes("SINGKARAK")) return "SINGKARAK";
+      if (u.includes("KAYU ARO") || u.includes("KAYUARO")) return "KAYUARO";
+      if (u.includes("SUNGAI RUMBAI") || u.includes("SUNGAIRUMBAI")) return "SUNGAIRUMBAI";
       return u;
     };
 
@@ -1222,7 +1063,7 @@ export class GoogleSheetsService {
       return a.ulp.localeCompare(b.ulp);
     });
 
-    const result: DashboardData = {
+    return {
       summary: {
         totalBaca: totalWoCount,
         totalValid: totalWoCctvCount,
@@ -1325,16 +1166,7 @@ export class GoogleSheetsService {
         });
         kpRatings.sort((a, b) => b.totalWoPlnMobile - a.totalWoPlnMobile);
 
-        const specificUlps = [...allUlps];
-        
-        // Dynamically add any other ULP names found in the dataset ratings
-        kpRatingStats.forEach((stats) => {
-          const sUlpName = getCanonicalUlpName(standardizeUlpName(stats.ulp));
-          if (sUlpName && !specificUlps.includes(sUlpName)) {
-            specificUlps.push(sUlpName);
-          }
-        });
-
+        const specificUlps = ["SOLOK", "SIJUNJUNG", "SAWAHLUNTO", "SILUNGKANG", "MUARALABUH", "SITIUNG", "SINGKARAK", "KAYU ARO", "SUNGAI RUMBAI"];
         const ulpRatingMap = new Map<string, { 
           totalWo: number; r5: number; r34: number; r12: number; noR: number;
         }>();
@@ -1350,9 +1182,6 @@ export class GoogleSheetsService {
           // Find the matching specific ULP (some might be slightly different in spelling, but standardizeUlpName should handle most)
           const matchedUlp = specificUlps.find(su => standardizeUlpName(su) === sUlp);
           if (matchedUlp) {
-            if (!ulpRatingMap.has(matchedUlp)) {
-              ulpRatingMap.set(matchedUlp, { totalWo: 0, r5: 0, r34: 0, r12: 0, noR: 0 });
-            }
             const current = ulpRatingMap.get(matchedUlp)!;
             current.totalWo += stats.totalWo;
             current.r5 += stats.r5;
@@ -1408,10 +1237,5 @@ export class GoogleSheetsService {
       },
       poIndices: { name: poNameIdx, ulp: poUlpIdx, cctv: poCctvIdx },
     };
-
-    // Store in processed cache map before returning
-    this.processedCacheMap.set(cacheKey, { data: result, timestamp: Date.now() });
-
-    return result;
   }
 }
