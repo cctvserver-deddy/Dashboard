@@ -289,13 +289,13 @@ export class GoogleSheetsService {
     const ulpToReguMap: Record<string, string> = {
       "SOLOK": "SOLOK",
       "SIJUNJUNG": "SIJUNJUNG",
-      "SAWAHLUNTO": "SAWAHLUNTO",
+      "SAWAHLUNTO": "SAWAH LUNTO",
       "SILUNGKANG": "SILUNGKANG",
-      "MUARALABUH": "MUARALABUH",
+      "MUARALABUH": "MUARA LABUH",
       "SITIUNG": "SITIUNG",
       "SINGKARAK": "SINGKARAK",
-      "KAYUARO": "KAYUARO",
-      "SUNGAIRUMBAI": "SUNGAIRUMBAI"
+      "KAYUARO": "KAYU ARO",
+      "SUNGAIRUMBAI": "SUNGAI RUMBAI"
     };
     const nUlp = this.normalizeForMatch(ulpName);
     const nRegu = this.normalizeForMatch(reguValue);
@@ -323,7 +323,7 @@ export class GoogleSheetsService {
       this.dateFilteredCache = null;
     }
 
-    const ALLOWED_REGUS = ["SOLOK", "SIJUNJUNG", "SAWAHLUNTO", "SILUNGKANG", "MUARALABUH", "SITIUNG", "SINGKARAK", "KAYUARO", "SUNGAIRUMBAI"];
+    const ALLOWED_REGUS = ["SOLOK", "SIJUNJUNG", "SAWAH LUNTO", "SILUNGKANG", "MUARA LABUH", "SITIUNG", "SINGKARAK", "KAYU ARO", "SUNGAI RUMBAI"];
     const isUp3Regu = (r: string) => {
       if (!r) return false;
       const normalized = r.toUpperCase().replace(/\s+/g, "").trim();
@@ -421,7 +421,7 @@ export class GoogleSheetsService {
       const u = name.toUpperCase().trim();
       if (u.includes("SOLOK")) return "SOLOK";
       if (u.includes("SIJUNJUNG")) return "SIJUNJUNG";
-      if (u.includes("SAWAHLUNTO")) return "SAWAHLUNTO";
+      if (u.includes("SAWAHLUNTO")) return "SAWAH LUNTO";
       if (u.includes("SILUNGKANG")) return "SILUNGKANG";
       if (u.includes("MUARALABUH") || u.includes("MUARA LABUH")) return "MUARALABUH";
       if (u.includes("SITIUNG")) return "SITIUNG";
@@ -462,13 +462,13 @@ export class GoogleSheetsService {
       const u = ulpName.toUpperCase().trim();
       if (u.includes("SOLOK")) return "SOLOK";
       if (u.includes("SIJUNJUNG")) return "SIJUNJUNG";
-      if (u.includes("SAWAHLUNTO")) return "SAWAHLUNTO";
+      if (u.includes("SAWAHLUNTO")) return "SAWAH LUNTO";
       if (u.includes("SILUNGKANG")) return "SILUNGKANG";
       if (u.includes("MUARALABUH") || u.includes("MUARA LABUH")) return "MUARALABUH";
       if (u.includes("SITIUNG")) return "SITIUNG";
       if (u.includes("SINGKARAK")) return "SINGKARAK";
-      if (u.includes("KAYU ARO") || u.includes("KAYUARO")) return "KAYUARO";
-      if (u.includes("SUNGAI RUMBAI") || u.includes("SUNGAIRUMBAI")) return "SUNGAIRUMBAI";
+      if (u.includes("KAYU ARO") || u.includes("KAYUARO")) return "KAYU ARO";
+      if (u.includes("SUNGAI RUMBAI") || u.includes("SUNGAIRUMBAI")) return "SUNGAI RUMBAI";
       return u;
     };
 
